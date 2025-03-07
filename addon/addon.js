@@ -13,6 +13,7 @@ import pLimit from "p-limit";
 import { searchContent } from './lib/scraper/prowlarr.js';
 import nameToImdb from 'name-to-imdb';
 import axios from 'axios';
+import { setTimeout } from 'timers/promises';
 
 const CACHE_MAX_AGE = parseInt(process.env.CACHE_MAX_AGE) || 60 * 60; // 1 hour in seconds
 const CACHE_MAX_AGE_EMPTY = 60; // 60 seconds
@@ -113,6 +114,7 @@ builder.defineStreamHandler((args) => {
 });
 
 builder.defineCatalogHandler((args) => {
+  // eslint-disable-next-line no-unused-vars
   const [_, mochKey, catalogId] = args.id.split('-');
   console.log(`Incoming catalog ${args.id} request with skip=${args.extra.skip || 0}`)
   return getMochCatalog(mochKey, catalogId, args.extra)
@@ -223,10 +225,13 @@ async function seriesRecordsHandler(args) {
       return dbResults;
     }
     
+    // Get selected providers from config
+    const selectedProviders = args.extra?.providers || [];
+    
     // Use Prowlarr scraper if enabled
     if (process.env.PROWLARR_API_KEY) {
       console.log(`[DEBUG] Searching Prowlarr for ${title} S${season}E${episode}`);
-      return searchContent(title, Type.SERIES, imdbId, null, season, episode);
+      return searchContent(title, Type.SERIES, imdbId, null, season, episode, selectedProviders);
     }
     
     return dbResults;
@@ -262,10 +267,13 @@ async function seriesRecordsHandler(args) {
     // This is a placeholder - you would need to implement a function to get the title
     let title = '';
     
+    // Get selected providers from config
+    const selectedProviders = args.extra?.providers || [];
+    
     // Use Prowlarr scraper if enabled
     if (process.env.PROWLARR_API_KEY && episode !== undefined && title) {
       console.log(`[DEBUG] Searching Prowlarr for Kitsu ${kitsuId} title: ${title}`);
-      return searchContent(title, Type.SERIES, null, kitsuId, null, episode);
+      return searchContent(title, Type.SERIES, null, kitsuId, null, episode, selectedProviders);
     }
     
     return episode !== undefined
@@ -301,10 +309,13 @@ async function movieRecordsHandler(args) {
       return dbResults;
     }
     
+    // Get selected providers from config
+    const selectedProviders = args.extra?.providers || [];
+    
     // Use Prowlarr scraper if enabled
     if (process.env.PROWLARR_API_KEY) {
       console.log(`[DEBUG] Searching Prowlarr for movie ${title}`);
-      return searchContent(title, Type.MOVIE, imdbId, null, null, null);
+      return searchContent(title, Type.MOVIE, imdbId, null, null, null, selectedProviders);
     }
     
     return dbResults;
@@ -327,10 +338,13 @@ async function movieRecordsHandler(args) {
     // This is a placeholder - you would need to implement a function to get the title
     let title = '';
     
+    // Get selected providers from config
+    const selectedProviders = args.extra?.providers || [];
+    
     // Use Prowlarr scraper if enabled
     if (process.env.PROWLARR_API_KEY && title) {
       console.log(`[DEBUG] Searching Prowlarr for Kitsu movie ${title}`);
-      return searchContent(title, Type.MOVIE, null, kitsuId, null, null);
+      return searchContent(title, Type.MOVIE, null, kitsuId, null, null, selectedProviders);
     }
     
     return dbResults;
