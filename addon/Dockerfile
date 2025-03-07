@@ -6,7 +6,7 @@ RUN apk update && apk upgrade && \
 WORKDIR /home/node/app
 
 COPY package*.json ./
-RUN npm ci --only-production
+RUN npm install --only=production
 COPY . .
 
 CMD [ "node", "--insecure-http-parser", "index.js" ]
