@@ -37,14 +37,50 @@ let BEST_TRACKERS = [];
 let ALL_ANIME_TRACKERS = [];
 let ALL_RUSSIAN_TRACKERS = [];
 
+/**
+ * Extract infoHash from a magnet link
+ * @param {string} magnetLink - The magnet link to extract from
+ * @returns {string|undefined} - The infoHash or undefined if not found
+ */
+export function extractInfoHash(magnetLink) {
+  if (!magnetLink) return undefined;
+  
+  try {
+    const parsed = magnet(magnetLink);
+    return parsed.infoHash ? parsed.infoHash.toLowerCase() : undefined;
+  } catch (error) {
+    console.error('Error extracting infoHash:', error.message);
+    
+    // Fallback to regex if magnet-uri fails
+    const match = magnetLink.match(/urn:btih:([^&]+)/i);
+    return match ? match[1].toLowerCase() : undefined;
+  }
+}
+
+/**
+ * Generate a magnet link from an infoHash
+ * @param {string} infoHash - The infoHash to use
+ * @returns {string} - The generated magnet link
+ */
 export async function getMagnetLink(infoHash) {
+  if (!infoHash) return '';
+  
   const torrent = await getTorrent(infoHash).catch(() => ({ infoHash }));
   const torrentTrackers = torrent?.trackers?.split(',') || [];
   const animeTrackers = torrent?.type === Type.ANIME ? ALL_ANIME_TRACKERS : [];
   const providerTrackers = RUSSIAN_PROVIDERS.includes(torrent?.provider) && ALL_RUSSIAN_TRACKERS || [];
   const trackers = unique([].concat(torrentTrackers).concat(animeTrackers).concat(providerTrackers));
-
-  return magnet.encode({ infoHash: infoHash, name: torrent?.title, announce: trackers });
+  
+  const magnetParams = {
+    xt: `urn:btih:${infoHash}`,
+    tr: trackers
+  };
+  
+  if (torrent?.title) {
+    magnetParams.dn = encodeURIComponent(torrent.title);
+  }
+  
+  return magnet.encode(magnetParams);
 }
 
 export async function initBestTrackers() {
