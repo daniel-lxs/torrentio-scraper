@@ -3,6 +3,7 @@ import swStats from 'swagger-stats';
 import serverless from './serverless.js';
 import { manifest } from './lib/manifest.js';
 import { initBestTrackers } from './lib/magnetHelper.js';
+import { initDatabase } from './lib/repository.js';
 
 const app = express();
 app.enable('trust proxy');
@@ -19,7 +20,16 @@ app.use(swStats.getMiddleware({
 }))
 app.use(express.static('static', { maxAge: '1y' }));
 app.use((req, res, next) => serverless(req, res, next));
-app.listen(process.env.PORT || 7000, () => {
-  initBestTrackers()
-      .then(() => console.log(`Started addon at: http://localhost:${process.env.PORT || 7000}`));
+app.listen(process.env.PORT || 7000, async () => {
+  try {
+    // Initialize database
+    await initDatabase();
+    
+    // Initialize best trackers
+    await initBestTrackers();
+    
+    console.log(`Started addon at: http://localhost:${process.env.PORT || 7000}`);
+  } catch (error) {
+    console.error('Error during initialization:', error);
+  }
 });

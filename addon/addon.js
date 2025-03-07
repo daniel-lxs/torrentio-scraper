@@ -10,29 +10,104 @@ import { applyMochs, getMochCatalog, getMochItemMeta } from './moch/moch.js';
 import StaticLinks from './moch/static.js';
 import { createNamedQueue } from "./lib/namedQueue.js";
 import pLimit from "p-limit";
+import { searchContent } from './lib/scraper/prowlarr.js';
+import nameToImdb from 'name-to-imdb';
+import axios from 'axios';
 
 const CACHE_MAX_AGE = parseInt(process.env.CACHE_MAX_AGE) || 60 * 60; // 1 hour in seconds
 const CACHE_MAX_AGE_EMPTY = 60; // 60 seconds
 const CATALOG_CACHE_MAX_AGE = 0; // 0 minutes
 const STALE_REVALIDATE_AGE = 4 * 60 * 60; // 4 hours
 const STALE_ERROR_AGE = 7 * 24 * 60 * 60; // 7 days
+const OMDB_API_KEY = process.env.OMDB_API_KEY || ''; // Add OMDB API key to environment variables
 
 const builder = new addonBuilder(dummyManifest());
 const requestQueue = createNamedQueue(Infinity);
 const newLimiter = pLimit(30)
+
+// Custom implementation of nameToImdbPromise that properly handles the callback
+function nameToImdbPromise(imdbId) {
+  return new Promise((resolve, reject) => {
+    nameToImdb(imdbId, (err, id, info) => {
+      if (err) return reject(err);
+      if (!info || !info.meta) return reject(new Error('No metadata found'));
+      resolve(info.meta);
+    });
+  });
+}
+
+// Function to get title from OMDB API
+async function getTitleFromOMDB(imdbId) {
+  if (!OMDB_API_KEY) {
+    console.log('OMDB API key not configured, skipping OMDB fallback');
+    return '';
+  }
+  
+  try {
+    const response = await axios.get(`http://www.omdbapi.com/?i=${imdbId}&apikey=${OMDB_API_KEY}`);
+    if (response.data && response.data.Title) {
+      console.log(`Retrieved title from OMDB for ${imdbId}: ${response.data.Title}`);
+      return response.data.Title;
+    }
+    console.error(`OMDB API returned no title for ${imdbId}`);
+    return '';
+  } catch (error) {
+    console.error(`Error getting title from OMDB for ${imdbId}:`, error.message);
+    return '';
+  }
+}
+
+// Function to get title with fallback
+async function getTitle(imdbId) {
+  let title = '';
+  
+  // Try nameToImdb first
+  try {
+    const meta = await nameToImdbPromise(imdbId);
+    title = meta.name || '';
+    if (title) {
+      return title;
+    }
+    console.error(`Error getting title for ${imdbId} from nameToImdb: empty name`);
+  } catch (error) {
+    console.error(`Error getting title for ${imdbId} from nameToImdb:`, error.message);
+  }
+  
+  // If nameToImdb fails, try OMDB
+  return getTitleFromOMDB(imdbId);
+}
 
 builder.defineStreamHandler((args) => {
   if (!args.id.match(/tt\d+/i) && !args.id.match(/kitsu:\d+/i)) {
     return Promise.resolve({ streams: [] });
   }
 
+  console.log(`[DEBUG] Stream request received for ${args.id}`);
   return requestQueue.wrap(args.id, () => resolveStreams(args))
-      .then(streams => applyFilters(streams, args.extra))
-      .then(streams => applySorting(streams, args.extra, args.type))
-      .then(streams => applyStaticInfo(streams))
-      .then(streams => applyMochs(streams, args.extra))
-      .then(streams => enrichCacheParams(streams))
+      .then(streams => {
+        console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} before filtering`);
+        return applyFilters(streams, args.extra);
+      })
+      .then(streams => {
+        console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after filtering`);
+        return applySorting(streams, args.extra, args.type);
+      })
+      .then(streams => {
+        console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after sorting`);
+        return applyStaticInfo(streams);
+      })
+      .then(streams => {
+        console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after static info`);
+        return applyMochs(streams, args.extra);
+      })
+      .then(streams => {
+        console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after mochs`);
+        const result = enrichCacheParams(streams);
+        console.log(`[DEBUG] Returning ${result.streams.length} streams to Stremio for ${args.id}`);
+        return result;
+      })
       .catch(error => {
+        console.error(`[ERROR] Failed request ${args.id}: ${error}`);
         return Promise.reject(`Failed request ${args.id}: ${error}`);
       });
 });
@@ -64,14 +139,54 @@ builder.defineMetaHandler((args) => {
 })
 
 async function resolveStreams(args) {
-  return cacheWrapStream(args.id, () => newLimiter(() => streamHandler(args)
+  // Set a timeout for waiting for results
+  const SEARCH_TIMEOUT = 30000; // 30 seconds timeout
+  
+  // Create a promise that resolves after the search completes or times out
+  const searchPromise = cacheWrapStream(args.id, () => newLimiter(() => streamHandler(args)
       .then(records => records
           .sort((a, b) => b.torrent.seeders - a.torrent.seeders || b.torrent.uploadDate - a.torrent.uploadDate)
           .map(record => toStreamInfo(record)))));
+  
+  // First check if we have cached results
+  const results = await searchPromise;
+  
+  // If results came from cache or we have results, return them immediately
+  if (results && (results._fromCache || results.length > 0)) {
+    console.log(`[DEBUG] Returning ${results.length} results for ${args.id}${results._fromCache ? ' from cache' : ''}`);
+    
+    // Remove the _fromCache flag before returning
+    if (results._fromCache) {
+      delete results._fromCache;
+    }
+    
+    return results;
+  }
+  
+  // If we don't have cached results and no results yet, wait for the search with a timeout
+  console.log(`[DEBUG] No cached results for ${args.id}, waiting for search with timeout...`);
+  
+  // Create a timeout promise
+  const timeoutPromise = new Promise(resolve => {
+    setTimeout(() => {
+      console.log(`Search timeout reached for ${args.id}`);
+      resolve([]);
+    }, SEARCH_TIMEOUT);
+  });
+  
+  // Race the search promise against the timeout
+  return Promise.race([
+    // We need to create a new promise here since we already awaited searchPromise
+    newLimiter(() => streamHandler(args)
+      .then(records => records
+          .sort((a, b) => b.torrent.seeders - a.torrent.seeders || b.torrent.uploadDate - a.torrent.uploadDate)
+          .map(record => toStreamInfo(record)))),
+    timeoutPromise
+  ]);
 }
 
 async function streamHandler(args) {
-  // console.log(`Pending count: ${newLimiter.pendingCount}, active count: ${newLimiter.activeCount}`, )
+  console.log(`[DEBUG] Processing stream request for ${args.id}`);
   if (args.type === Type.MOVIE) {
     return movieRecordsHandler(args);
   } else if (args.type === Type.SERIES) {
@@ -86,11 +201,73 @@ async function seriesRecordsHandler(args) {
     const imdbId = parts[0];
     const season = parts[1] !== undefined ? parseInt(parts[1], 10) : 1;
     const episode = parts[2] !== undefined ? parseInt(parts[2], 10) : 1;
-    return repository.getImdbIdSeriesEntries(imdbId, season, episode);
+    
+    console.log(`[DEBUG] Checking database for series ${imdbId} S${season}E${episode}`);
+    // First check the database for existing entries
+    const dbResults = await repository.getImdbIdSeriesEntries(imdbId, season, episode);
+    console.log(`[DEBUG] Found ${dbResults.length} results in database for ${imdbId} S${season}E${episode}`);
+    
+    // If we have enough results from the database, return them without searching Prowlarr
+    if (dbResults.length >= 5) {
+      console.log(`[DEBUG] Returning ${dbResults.length} results from database for ${imdbId} S${season}E${episode}`);
+      return dbResults;
+    }
+    
+    // Get metadata for the series to get the title
+    console.log(`[DEBUG] Getting title for ${imdbId}`);
+    const title = await getTitle(imdbId);
+    
+    // If we couldn't get a title, just return database results
+    if (!title) {
+      console.log(`[DEBUG] Could not get title for ${imdbId}, returning database results only (${dbResults.length})`);
+      return dbResults;
+    }
+    
+    // Use Prowlarr scraper if enabled
+    if (process.env.PROWLARR_API_KEY) {
+      console.log(`[DEBUG] Searching Prowlarr for ${title} S${season}E${episode}`);
+      return searchContent(title, Type.SERIES, imdbId, null, season, episode);
+    }
+    
+    return dbResults;
   } else if (args.id.match(/^kitsu:\d+(?::\d+)?$/i)) {
     const parts = args.id.split(':');
     const kitsuId = parts[1];
     const episode = parts[2] !== undefined ? parseInt(parts[2], 10) : undefined;
+    
+    // For Kitsu IDs, check database first
+    if (episode !== undefined) {
+      console.log(`[DEBUG] Checking database for Kitsu ${kitsuId} E${episode}`);
+      const dbResults = await repository.getKitsuIdSeriesEntries(kitsuId, episode);
+      console.log(`[DEBUG] Found ${dbResults.length} results in database for Kitsu ${kitsuId} E${episode}`);
+      
+      // If we have enough results from the database, return them
+      if (dbResults.length >= 5) {
+        console.log(`[DEBUG] Returning ${dbResults.length} results from database for Kitsu ${kitsuId} E${episode}`);
+        return dbResults;
+      }
+    } else {
+      console.log(`[DEBUG] Checking database for Kitsu movie ${kitsuId}`);
+      const dbResults = await repository.getKitsuIdMovieEntries(kitsuId);
+      console.log(`[DEBUG] Found ${dbResults.length} results in database for Kitsu movie ${kitsuId}`);
+      
+      // If we have enough results from the database, return them
+      if (dbResults.length >= 5) {
+        console.log(`[DEBUG] Returning ${dbResults.length} results from database for Kitsu movie ${kitsuId}`);
+        return dbResults;
+      }
+    }
+    
+    // For Kitsu IDs, we would need to get the title from a Kitsu API
+    // This is a placeholder - you would need to implement a function to get the title
+    let title = '';
+    
+    // Use Prowlarr scraper if enabled
+    if (process.env.PROWLARR_API_KEY && episode !== undefined && title) {
+      console.log(`[DEBUG] Searching Prowlarr for Kitsu ${kitsuId} title: ${title}`);
+      return searchContent(title, Type.SERIES, null, kitsuId, null, episode);
+    }
+    
     return episode !== undefined
         ? repository.getKitsuIdSeriesEntries(kitsuId, episode)
         : repository.getKitsuIdMovieEntries(kitsuId);
@@ -102,9 +279,61 @@ async function movieRecordsHandler(args) {
   if (args.id.match(/^tt\d+$/)) {
     const parts = args.id.split(':');
     const imdbId = parts[0];
-    return repository.getImdbIdMovieEntries(imdbId);
-  } else if (args.id.match(/^kitsu:\d+(?::\d+)?$/i)) {
-    return seriesRecordsHandler(args);
+    
+    console.log(`[DEBUG] Checking database for movie ${imdbId}`);
+    // First check the database for existing entries
+    const dbResults = await repository.getImdbIdMovieEntries(imdbId);
+    console.log(`[DEBUG] Found ${dbResults.length} results in database for movie ${imdbId}`);
+    
+    // If we have enough results from the database, return them without searching Prowlarr
+    if (dbResults.length >= 5) {
+      console.log(`[DEBUG] Returning ${dbResults.length} results from database for movie ${imdbId}`);
+      return dbResults;
+    }
+    
+    // Get metadata for the movie to get the title
+    console.log(`[DEBUG] Getting title for ${imdbId}`);
+    const title = await getTitle(imdbId);
+    
+    // If we couldn't get a title, just return database results
+    if (!title) {
+      console.log(`[DEBUG] Could not get title for ${imdbId}, returning database results only (${dbResults.length})`);
+      return dbResults;
+    }
+    
+    // Use Prowlarr scraper if enabled
+    if (process.env.PROWLARR_API_KEY) {
+      console.log(`[DEBUG] Searching Prowlarr for movie ${title}`);
+      return searchContent(title, Type.MOVIE, imdbId, null, null, null);
+    }
+    
+    return dbResults;
+  } else if (args.id.match(/^kitsu:\d+$/i)) {
+    const parts = args.id.split(':');
+    const kitsuId = parts[1];
+    
+    console.log(`[DEBUG] Checking database for Kitsu movie ${kitsuId}`);
+    // First check the database for existing entries
+    const dbResults = await repository.getKitsuIdMovieEntries(kitsuId);
+    console.log(`[DEBUG] Found ${dbResults.length} results in database for Kitsu movie ${kitsuId}`);
+    
+    // If we have enough results from the database, return them without searching Prowlarr
+    if (dbResults.length >= 5) {
+      console.log(`[DEBUG] Returning ${dbResults.length} results from database for Kitsu movie ${kitsuId}`);
+      return dbResults;
+    }
+    
+    // For Kitsu IDs, we would need to get the title from a Kitsu API
+    // This is a placeholder - you would need to implement a function to get the title
+    let title = '';
+    
+    // Use Prowlarr scraper if enabled
+    if (process.env.PROWLARR_API_KEY && title) {
+      console.log(`[DEBUG] Searching Prowlarr for Kitsu movie ${title}`);
+      return searchContent(title, Type.MOVIE, null, kitsuId, null, null);
+    }
+    
+    return dbResults;
   }
   return Promise.resolve([]);
 }

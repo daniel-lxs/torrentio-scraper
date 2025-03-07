@@ -5,11 +5,29 @@ const DATABASE_URI = process.env.DATABASE_URI;
 
 const database = new Sequelize(DATABASE_URI, { logging: false, pool: { max: 30, min: 5, idle: 20 * 60 * 1000 } });
 
+// Function to alter column size if needed
+async function alterTorrentIdColumnSize() {
+  try {
+    // Check if the table exists
+    const tableExists = await database.getQueryInterface().showAllTables()
+      .then(tables => tables.includes('torrents'));
+    
+    if (tableExists) {
+      console.log('Altering torrentId column size to 512 characters');
+      // Alter the column size
+      await database.query('ALTER TABLE torrents ALTER COLUMN "torrentId" TYPE VARCHAR(512)');
+      console.log('Successfully altered torrentId column size');
+    }
+  } catch (error) {
+    console.error('Error altering torrentId column size:', error.message);
+  }
+}
+
 const Torrent = database.define('torrent',
     {
       infoHash: { type: Sequelize.STRING(64), primaryKey: true },
       provider: { type: Sequelize.STRING(32), allowNull: false },
-      torrentId: { type: Sequelize.STRING(128) },
+      torrentId: { type: Sequelize.STRING(512) },
       title: { type: Sequelize.STRING(256), allowNull: false },
       size: { type: Sequelize.BIGINT },
       type: { type: Sequelize.STRING(16), allowNull: false },
@@ -66,6 +84,29 @@ Torrent.hasMany(File, { foreignKey: 'infoHash', constraints: false });
 File.belongsTo(Torrent, { foreignKey: 'infoHash', constraints: false });
 File.hasMany(Subtitle, { foreignKey: 'fileId', constraints: false });
 Subtitle.belongsTo(File, { foreignKey: 'fileId', constraints: false });
+
+// Initialize database
+export async function initDatabase() {
+  try {
+    await database.authenticate();
+    console.log('Database connection has been established successfully.');
+    
+    // Sync models with database
+    await database.sync();
+    console.log('Database models synchronized successfully.');
+    
+    // Alter column size if needed
+    await alterTorrentIdColumnSize();
+    
+    return true;
+  } catch (error) {
+    console.error('Unable to connect to the database:', error);
+    return false;
+  }
+}
+
+// Call the initialization function
+initDatabase();
 
 export function getTorrent(infoHash) {
   return Torrent.findOne({ where: { infoHash: infoHash } });
@@ -128,4 +169,45 @@ export function getKitsuIdSeriesEntries(kitsuId, episode) {
       [Torrent, 'seeders', 'DESC']
     ]
   });
+}
+
+export async function saveTorrentsAndFiles(torrents, files) {
+  // Use a transaction to ensure data consistency
+  const transaction = await database.transaction();
+  
+  try {
+    // Insert torrents with upsert (update if exists)
+    for (const torrent of torrents) {
+      await Torrent.upsert(torrent, { transaction });
+    }
+    
+    // Insert files with upsert (update if exists)
+    for (const file of files) {
+      // For files, we need to check if a file with the same infoHash and fileIndex exists
+      const existingFile = await File.findOne({
+        where: {
+          infoHash: file.infoHash,
+          fileIndex: file.fileIndex
+        },
+        transaction
+      });
+      
+      if (existingFile) {
+        // Update existing file
+        await existingFile.update(file, { transaction });
+      } else {
+        // Create new file
+        await File.create(file, { transaction });
+      }
+    }
+    
+    // Commit the transaction
+    await transaction.commit();
+    return true;
+  } catch (error) {
+    // Rollback the transaction in case of error
+    await transaction.rollback();
+    console.error('Error saving torrents and files:', error);
+    throw error;
+  }
 }

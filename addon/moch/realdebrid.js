@@ -2,7 +2,7 @@ import RealDebridClient from 'real-debrid-api';
 import { Type } from '../lib/types.js';
 import { isVideo, isArchive } from '../lib/extension.js';
 import { delay } from '../lib/promises.js';
-import { cacheAvailabilityResults, getCachedAvailabilityResults, removeAvailabilityResults } from '../lib/cache.js';
+import { cacheAvailabilityResults, getCachedAvailabilityResults, removeAvailabilityResults, markTorrentAsPlayed, getPlayedTorrents } from '../lib/cache.js';
 import StaticResponse from './static.js';
 import { getMagnetLink } from '../lib/magnetHelper.js';
 import { BadTokenError, AccessDeniedError } from './mochHelper.js';
@@ -15,17 +15,40 @@ const DEBRID_DOWNLOADS = 'Downloads';
 
 export async function getCachedStreams(streams, apiKey) {
   const hashes = streams.map(stream => stream.infoHash);
-  const available = await getCachedAvailabilityResults(hashes);
-  return available && streams
-      .reduce((mochStreams, stream) => {
-        const cachedEntry = available[stream.infoHash];
-        const cachedIds = _getCachedFileIds(stream.fileIdx, cachedEntry);
-        mochStreams[`${stream.infoHash}@${stream.fileIdx}`] = {
-          url: `${apiKey}/${stream.infoHash}/null/${stream.fileIdx}`,
-          cached: !!cachedIds.length
-        };
-        return mochStreams;
-      }, {})
+  const fileIndexes = streams.map(stream => stream.fileIdx);
+  
+  // First check our local cache
+  const cachedAvailability = await getCachedAvailabilityResults(hashes);
+  
+  // Also check for played torrents
+  const playedTorrents = await getPlayedTorrents(hashes, fileIndexes);
+  
+  // Log cache hit statistics
+  const cachedCount = Object.keys(cachedAvailability).length;
+  const playedCount = Object.keys(playedTorrents).length;
+  console.log(`[DEBUG] Cache stats for ${streams.length} streams: ${cachedCount} in availability cache, ${playedCount} in played torrents`);
+  
+  // Return the results directly from cache and played torrents
+  const results = streams.reduce((mochStreams, stream) => {
+    const cachedEntry = cachedAvailability[stream.infoHash];
+    const cachedIds = _getCachedFileIds(stream.fileIdx, cachedEntry);
+    const isPlayed = playedTorrents[`${stream.infoHash}@${stream.fileIdx}`];
+    const isCached = !!cachedIds.length || !!isPlayed;
+    
+    // Add more detailed logging for debugging
+    if (isCached) {
+      const source = cachedIds.length ? 'availability cache' : 'played torrents';
+      console.log(`[DEBUG] Stream ${stream.infoHash}@${stream.fileIdx} marked as cached from ${source}`);
+    }
+    
+    mochStreams[`${stream.infoHash}@${stream.fileIdx}`] = {
+      url: `${apiKey}/${stream.infoHash}/null/${stream.fileIdx}`,
+      cached: isCached // Mark as cached if it's in our cache or it's been played
+    };
+    return mochStreams;
+  }, {});
+  
+  return results;
 }
 
 function _getCachedFileIds(fileIndex, cachedResults) {
@@ -119,6 +142,14 @@ export async function resolve({ ip, isBrowser, apiKey, infoHash, fileIndex }) {
   const RD = new RealDebridClient(apiKey, options);
 
   return _resolve(RD, infoHash, fileIndex, isBrowser)
+      .then(async result => {
+        // Mark this torrent as played when it's successfully resolved
+        const marked = await markTorrentAsPlayed(infoHash, fileIndex);
+        if (!marked) {
+          console.warn(`Failed to mark torrent ${infoHash} [${fileIndex}] as played, but continuing with playback`);
+        }
+        return result;
+      })
       .catch(error => {
         if (isAccessDeniedError(error)) {
           console.log(`Access denied to RealDebrid ${infoHash} [${fileIndex}]`);
@@ -140,11 +171,20 @@ export async function resolve({ ip, isBrowser, apiKey, infoHash, fileIndex }) {
       });
 }
 
-async function _resolveCachedFileIds(infoHash, fileIndex) {
+async function _resolveCachedFileIds(RD, infoHash, fileIndex) {
   const available = await getCachedAvailabilityResults([infoHash]);
   const cachedEntry = available?.[infoHash];
-  const cachedIds = _getCachedFileIds(fileIndex, cachedEntry);
-  return cachedIds?.join(',');
+  
+  if (cachedEntry) {
+    console.log(`[DEBUG] Found cached availability for ${infoHash} in local cache`);
+    const cachedIds = _getCachedFileIds(fileIndex, cachedEntry);
+    return cachedIds?.join(',');
+  }
+  
+  // The instantAvailability endpoint is no longer available
+  // We'll skip this and return null
+  console.log(`[DEBUG] No cached availability for ${infoHash}, returning null`);
+  return null;
 }
 
 async function _resolve(RD, infoHash, fileIndex, isBrowser) {
@@ -212,7 +252,7 @@ async function _getTorrentInfo(RD, torrentId) {
 async function _createTorrentId(RD, infoHash, fileIndex, force = false) {
   const magnetLink = await getMagnetLink(infoHash);
   const addedMagnet = await RD.torrents.addMagnet(magnetLink);
-  const cachedFileIds = !force && await _resolveCachedFileIds(infoHash, fileIndex);
+  const cachedFileIds = !force && await _resolveCachedFileIds(RD, infoHash, fileIndex);
   if (cachedFileIds && !['null', 'undefined'].includes(cachedFileIds)) {
     await RD.torrents.selectFiles(addedMagnet.id, cachedFileIds);
   } else if (!force) {
@@ -362,5 +402,5 @@ function isTorrentTooBigError(error) {
 }
 
 async function getDefaultOptions(ip) {
-  return { ip, timeout: 15000 };
+  return { ip: ip || undefined, timeout: 15000 };
 }

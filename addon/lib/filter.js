@@ -238,37 +238,77 @@ export default function applyFilters(streams, config) {
 }
 
 function filterByProvider(streams, config) {
+  // If we're using Prowlarr, skip provider filtering
+  if (process.env.PROWLARR_API_KEY) {
+    console.log(`[DEBUG] Skipping provider filtering because Prowlarr is enabled`);
+    return streams;
+  }
+  
   const providers = config.providers || defaultProviderKeys;
   if (!providers?.length) {
     return streams;
   }
+  
+  console.log(`[DEBUG] Filtering by providers: ${providers.join(', ')}`);
   return streams.filter(stream => {
-    const provider = extractProvider(stream.title).toLowerCase();
-    return providers.includes(provider);
-  })
+    const provider = extractProvider(stream.title)?.toLowerCase();
+    if (!provider) {
+      console.log(`[DEBUG] No provider found in stream title: ${stream.title}`);
+      return true; // Include streams with no provider
+    }
+    const included = providers.includes(provider);
+    if (!included) {
+      console.log(`[DEBUG] Provider ${provider} not in allowed list`);
+    }
+    return included;
+  });
 }
 
 function filterByQuality(streams, config) {
+  // If we're using Prowlarr, skip quality filtering
+  if (process.env.PROWLARR_API_KEY) {
+    console.log(`[DEBUG] Skipping quality filtering because Prowlarr is enabled`);
+    return streams;
+  }
+  
   const filters = config[QualityFilter.key];
   if (!filters) {
     return streams;
   }
+  
+  console.log(`[DEBUG] Filtering by quality: ${filters.join(', ')}`);
   const filterOptions = QualityFilter.options.filter(option => filters.includes(option.key));
   return streams.filter(stream => {
     const streamQuality = stream.name.split('\n')[1];
     const bingeGroup = stream.behaviorHints?.bingeGroup;
-    return !filterOptions.some(option => option.test(streamQuality, bingeGroup));
+    const filtered = !filterOptions.some(option => option.test(streamQuality, bingeGroup));
+    if (!filtered) {
+      console.log(`[DEBUG] Stream filtered out by quality: ${streamQuality}`);
+    }
+    return filtered;
   });
 }
 
 function filterBySize(streams, config) {
+  // If we're using Prowlarr, skip size filtering
+  if (process.env.PROWLARR_API_KEY) {
+    console.log(`[DEBUG] Skipping size filtering because Prowlarr is enabled`);
+    return streams;
+  }
+  
   const sizeFilters = config[SizeFilter.key];
   if (!sizeFilters?.length) {
     return streams;
   }
+  
+  console.log(`[DEBUG] Filtering by size: ${sizeFilters.join(', ')}`);
   const sizeLimit = parseSize(config.type === Type.MOVIE ? sizeFilters.shift() : sizeFilters.pop());
   return streams.filter(stream => {
-    const size = extractSize(stream.title)
-    return size <= sizeLimit;
-  })
+    const size = extractSize(stream.title);
+    const withinLimit = size <= sizeLimit;
+    if (!withinLimit) {
+      console.log(`[DEBUG] Stream filtered out by size: ${size} > ${sizeLimit}`);
+    }
+    return withinLimit;
+  });
 }

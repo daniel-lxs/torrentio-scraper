@@ -5,6 +5,20 @@ const DATABASE_URI = process.env.DATABASE_URI;
 
 const database = new Sequelize(DATABASE_URI, { logging: false });
 
+// Verify database connection
+async function verifyDatabaseConnection() {
+  try {
+    console.log('Verifying database connection...');
+    await database.authenticate();
+    console.log('Database connection established successfully.');
+  } catch (error) {
+    console.error('Error connecting to database:', error);
+  }
+}
+
+// Call the verification function
+verifyDatabaseConnection();
+
 export async function getIds(providers, type, startDate, endDate) {
   const idName = type === Type.ANIME ? 'kitsuId' : 'imdbId';
   const episodeCondition = type === Type.SERIES
