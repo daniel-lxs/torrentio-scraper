@@ -193,7 +193,12 @@ export default function landingTemplate(manifest, config = {}) {
          <a href="mailto:${manifest.contactEmail}">${manifest.contactEmail}</a>
       </div>` : '<div class="separator"></div>';
   const providersHTML = Providers.options
-      .map(provider => `<option value="${provider.key}">${provider.foreign || ''}${provider.label}</option>`)
+      .map(provider => {
+        if (provider.prowlarrId) {
+          return `<option value="${provider.key}">🔍 ${provider.label}</option>`;
+        }
+        return `<option value="${provider.key}">${provider.foreign || ''}${provider.label}</option>`;
+      })
       .join('\n');
   const stylizedTypes = manifest.types
       .map(t => t[0].toUpperCase() + t.slice(1) + (t !== 'series' ? 's' : ''));
