@@ -77,6 +77,8 @@ services:
       - PROWLARR_SEARCH_LIMIT=100
       - PROWLARR_PARALLEL_REQUESTS=10
       - OMDB_API_KEY=${OMDB_API_KEY:-}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
     ports:
       - "7000:7000"
 

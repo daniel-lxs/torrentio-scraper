@@ -9,6 +9,9 @@ import { manifest } from './lib/manifest.js';
 import { parseConfiguration, PreConfigurations } from './lib/configuration.js';
 import landingTemplate from './lib/landingTemplate.js';
 import * as moch from './moch/moch.js';
+import * as repository from './lib/repository.js';
+import bodyParser from 'body-parser';
+import { Buffer } from 'buffer';
 
 const router = new Router();
 const limiter = rateLimit({
@@ -102,6 +105,143 @@ router.get('/:moch/:apiKey/:infoHash/:cachedEntryInfo/:fileIndex/:filename?', (r
         res.statusCode = 404;
         res.end();
       });
+});
+
+// Admin authentication middleware
+const authenticateAdmin = (req, res, next) => {
+  const adminUsername = process.env.ADMIN_USERNAME;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  
+  if (!adminUsername || !adminPassword) {
+    console.error('Admin credentials not configured');
+    res.writeHead(500);
+    res.end(JSON.stringify({ error: 'Admin credentials not configured' }));
+    return;
+  }
+  
+  // Get credentials from Basic Auth header
+  const authHeader = req.headers.authorization || '';
+  const match = authHeader.match(/^Basic\s+(.*)$/);
+  
+  if (!match) {
+    res.writeHead(401, { 'WWW-Authenticate': 'Basic' });
+    res.end(JSON.stringify({ error: 'Authentication required' }));
+    return;
+  }
+  
+  const credentials = Buffer.from(match[1], 'base64').toString().split(':');
+  const username = credentials[0];
+  const password = credentials[1];
+  
+  if (username === adminUsername && password === adminPassword) {
+    next();
+  } else {
+    res.writeHead(401, { 'WWW-Authenticate': 'Basic' });
+    res.end(JSON.stringify({ error: 'Invalid credentials' }));
+  }
+};
+
+// API key validation middleware
+const validateApiKey = async (req, res, next) => {
+  // Skip validation for specific routes
+  const skipPaths = [
+    /^\/configure$/,
+    /^\/[^/]+\/configure$/,
+    /^\/admin$/,
+    /^\/admin\.html$/,
+    /^\/admin\/.*/,
+    /^\/manifest.json$/,
+    /^\/[^/]+\/manifest.json$/,
+    /^\/static\/.*/  // Skip validation for static files
+  ];
+  
+  if (skipPaths.some(pattern => pattern.test(req.url))) {
+    return next();
+  }
+  
+  // Extract API key from configuration in URL
+  const urlParts = req.url.split('/');
+  const configuration = urlParts[1] || '';
+  
+  // Parse configuration to get API key
+  const configValues = parseConfiguration(configuration);
+  const apiKey = configValues.apiKey;
+  
+  // Validate the API key
+  const isValid = await repository.validateApiKey(apiKey);
+  
+  if (isValid) {
+    next();
+  } else {
+    res.writeHead(401);
+    res.end(JSON.stringify({ error: 'Invalid or missing API key' }));
+  }
+};
+
+// Apply API key validation middleware to all routes
+router.use(validateApiKey);
+
+// Admin API key management routes
+router.use('/admin/apikeys', bodyParser.json());
+
+// List all API keys
+router.get('/admin/apikeys', authenticateAdmin, async (req, res) => {
+  try {
+    const apiKeys = await repository.listApiKeys();
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify(apiKeys));
+  } catch (error) {
+    console.error('Error listing API keys:', error);
+    res.writeHead(500);
+    res.end(JSON.stringify({ error: 'Failed to list API keys' }));
+  }
+});
+
+// Create a new API key
+router.post('/admin/apikeys', authenticateAdmin, async (req, res) => {
+  try {
+    const { name } = req.body;
+    
+    if (!name) {
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: 'Name is required' }));
+      return;
+    }
+    
+    const key = await repository.createApiKey(name);
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ key, name }));
+  } catch (error) {
+    console.error('Error creating API key:', error);
+    res.writeHead(500);
+    res.end(JSON.stringify({ error: 'Failed to create API key' }));
+  }
+});
+
+// Deactivate an API key
+router.delete('/admin/apikeys/:key', authenticateAdmin, async (req, res) => {
+  try {
+    const { key } = req.params;
+    const success = await repository.deactivateApiKey(key);
+    
+    if (success) {
+      res.writeHead(200);
+      res.end(JSON.stringify({ success: true }));
+    } else {
+      res.writeHead(404);
+      res.end(JSON.stringify({ error: 'API key not found' }));
+    }
+  } catch (error) {
+    console.error('Error deactivating API key:', error);
+    res.writeHead(500);
+    res.end(JSON.stringify({ error: 'Failed to deactivate API key' }));
+  }
+});
+
+// Admin page route
+router.get('/admin', (req, res) => {
+  res.redirect('/admin.html');
+  res.end();
 });
 
 export default function (req, res) {

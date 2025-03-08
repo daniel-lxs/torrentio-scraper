@@ -9,6 +9,7 @@ This is a modified version of the Torrentio-Scraper project that uses Prowlarr f
 - **PostgreSQL database** for storing torrent information
 - **Docker Compose** setup for easy deployment
 - **Real Debrid integration** for streaming
+- **API key authentication** for secure access
 
 ## Prerequisites
 
@@ -23,10 +24,25 @@ This is a modified version of the Torrentio-Scraper project that uses Prowlarr f
    cd torrentio-scraper
    ```
 
-2. Start the services:
+2. Set up admin credentials in the .env file:
+   ```
+   ADMIN_USERNAME=your_admin_username
+   ADMIN_PASSWORD=your_secure_password
+   ```
+
+3. Start the services:
    ```bash
    docker-compose up -d
    ```
+
+4. Generate API keys for users:
+   - Navigate to `http://your-server-address/admin`
+   - Log in with your admin credentials
+   - Create API keys for users who need access
+
+5. Users must include their API key when installing the addon in Stremio
+   - The configuration page will prompt for an API key
+   - All requests to the addon will be authenticated using this key
 
 3. Configure Prowlarr:
    - Access Prowlarr at http://localhost:9696

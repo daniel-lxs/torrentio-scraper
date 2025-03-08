@@ -354,6 +354,12 @@ export default function landingTemplate(manifest, config = {}) {
            </select>
          </div>
          
+         <div id="dApiKey">
+           <label class="label" for="iApiKey">API Key (Required):</label>
+           <input type="text" id="iApiKey" onchange="generateInstallLink()" class="input" placeholder="Enter your API key" required>
+           <p style="font-size: 1.4vh; margin-bottom: 10px;">This addon requires an API key for authentication. Contact the administrator to get one.</p>
+         </div>
+         
          <div class="separator"></div>
 
          <a id="installLink" class="install-link" href="#">
@@ -413,6 +419,7 @@ export default function landingTemplate(manifest, config = {}) {
               $('#iSort').val("${sort}");
               $('#iLimit').val("${limit}");
               $('#iSizeFilter').val("${sizeFilter}");
+              $('#iApiKey').val("${config.apiKey || ''}");
               generateInstallLink();
               debridProvidersChange();
           });
@@ -456,6 +463,7 @@ export default function landingTemplate(manifest, config = {}) {
               const torboxValue = $('#iTorbox').val() || '';
               const putioClientIdValue = $('#iPutioClientId').val() || '';
               const putioTokenValue = $('#iPutioToken').val() || '';
+              const apiKeyValue = $('#iApiKey').val() || '';
               
               
               const providers = providersList.length && providersList.length < ${Providers.options.length} && providersValue;
@@ -473,6 +481,7 @@ export default function landingTemplate(manifest, config = {}) {
               const offcloud = offcloudValue.length && offcloudValue.trim();
               const torbox = torboxValue.length && torboxValue.trim();
               const putio = putioClientIdValue.length && putioTokenValue.length && putioClientIdValue.trim() + '@' + putioTokenValue.trim();
+              const apiKey = apiKeyValue.length && apiKeyValue.trim();
 
               const preConfigurations = { 
                 ${preConfigurationObject}
@@ -491,7 +500,8 @@ export default function landingTemplate(manifest, config = {}) {
                     ['${MochOptions.debridlink.key}', debridLink],
                     ['${MochOptions.offcloud.key}', offcloud],
                     ['${MochOptions.torbox.key}', torbox],
-                    ['${MochOptions.putio.key}', putio]
+                    ['${MochOptions.putio.key}', putio],
+                    ['apiKey', apiKey]
                   ].filter(([_, value]) => value.length).map(([key, value]) => key + '=' + value).join('|');
               configurationValue = Object.entries(preConfigurations)
                   .filter(([key, value]) => value === configurationValue)
