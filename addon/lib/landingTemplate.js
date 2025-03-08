@@ -214,13 +214,18 @@ export default function landingTemplate(manifest, config = {}) {
   const background = manifest.background || 'https://dl.strem.io/addon-background.jpg';
   const logo = manifest.logo || 'https://dl.strem.io/addon-logo.png';
   const providersHTML = Providers.options
-      .map(provider => `<option value="${provider.key}">${provider.foreign ? provider.foreign + ' ' : ''}${provider.label}</option>`)
+      .map(provider => {
+        if (provider.prowlarrId) {
+          return `<option value="${provider.key}">🔍 ${provider.label}</option>`;
+        }
+        return `<option value="${provider.key}">${provider.foreign ? provider.foreign + ' ' : ''}${provider.label}</option>`;
+      })
       .join('\n');
   const sortOptionsHTML = Object.values(SortOptions.options)
       .map((option, i) => `<option value="${option.key}" ${i === 0 ? 'selected' : ''}>${option.description}</option>`)
       .join('\n');
   const languagesOptionsHTML = LanguageOptions.options
-      .map((option, i) => `<option value="${option.key}">${option.label}</option>`)
+      .map((option) => `<option value="${option.key}">${option.label}</option>`)
       .join('\n');
   const qualityFiltersHTML = Object.values(QualityFilter.options)
       .map(option => `<option value="${option.key}">${option.label}</option>`)
