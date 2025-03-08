@@ -3,6 +3,7 @@ import { Type } from '../types.js';
 import * as repository from '../repository.js';
 import { extractInfoHash } from '../magnetHelper.js';
 import * as ptt from 'parse-torrent-title';
+import { Providers, refreshProviders } from '../filter.js';
 
 // Constants
 const PROWLARR_BASE_URL = process.env.PROWLARR_BASE_URL || 'http://localhost:9696';
@@ -68,55 +69,62 @@ function chunkArray(array, chunkSize) {
   return chunks;
 }
 
-// Helper function to process a single result and get magnet link
-async function processSingleResult(result, type, imdbId, kitsuId, season, episode) {
-  try {
-    // Get magnet link from downloadUrl if available
-    let magnetUrl = null;
-    
-    if (result.downloadUrl) {
-      try {
-        console.log(`Getting magnet link from downloadUrl: ${result.downloadUrl}`);
-        
-        // Make a GET request without following redirects
-        const response = await axios.get(result.downloadUrl, {
-          maxRedirects: 0,
-          headers: {
-            'User-Agent': 'curl/8.12.1' // Match curl's UA
-          }
-        });
-        
-        // Check for Location header (case insensitive)
-        const location = response.headers.location || response.headers.Location;
-        
-        if (location && location.startsWith('magnet:')) {
-          magnetUrl = location;
-          console.log(`Successfully obtained magnet link from redirect header`);
-        } else {
-          console.log(`No magnet link in Location header: ${JSON.stringify(response.headers)}`);
+// Process downloadUrls in parallel to get magnet URLs
+async function getMagnetUrls(results) {
+  // Filter out results without downloadUrl first
+  const validResults = results.filter(result => {
+    if (!result.downloadUrl) {
+      console.log(`No downloadUrl for result: ${result.title}`);
+      return false;
+    }
+    return true;
+  });
+
+  // Process all downloadUrls in parallel
+  const promises = validResults.map(async result => {
+    try {
+      console.log(`Getting magnet link from downloadUrl: ${result.downloadUrl}`);
+      
+      // Make a GET request without following redirects
+      const response = await axios.get(result.downloadUrl, {
+        maxRedirects: 0,
+        headers: {
+          'User-Agent': 'curl/8.12.1' // Match curl's UA
         }
-      } catch (error) {
-        // Even in case of error, check if we got a redirect in the error response
-        if (error.response && error.response.headers) {
-          const location = error.response.headers.location || error.response.headers.Location;
-          if (location && location.startsWith('magnet:')) {
-            magnetUrl = location;
-            console.log(`Successfully obtained magnet link from error response redirect header`);
-          } else {
-            console.error(`Error getting magnet link: ${error.message}`);
-          }
-        } else {
-          console.error(`Error getting magnet link: ${error.message}`);
+      });
+      
+      // Check for Location header (case insensitive)
+      const location = response.headers.location || response.headers.Location;
+      
+      if (location && location.startsWith('magnet:')) {
+        console.log(`Successfully obtained magnet link from redirect header`);
+        return { result, magnetUrl: location };
+      } else {
+        console.log(`No magnet link in Location header: ${JSON.stringify(response.headers)}`);
+        return null;
+      }
+    } catch (error) {
+      // Even in case of error, check if we got a redirect in the error response
+      if (error.response && error.response.headers) {
+        const location = error.response.headers.location || error.response.headers.Location;
+        if (location && location.startsWith('magnet:')) {
+          console.log(`Successfully obtained magnet link from error response redirect header`);
+          return { result, magnetUrl: location };
         }
       }
-    }
-    
-    // Skip results without magnet links
-    if (!magnetUrl) {
-      console.log(`No magnet link found for result: ${result.title}`);
+      console.error(`Error getting magnet link: ${error.message}`);
       return null;
     }
+  });
 
+  // Wait for all requests to complete and return valid results
+  const responses = await Promise.all(promises);
+  return responses.filter(response => response !== null);
+}
+
+// Process a single result with a magnet URL
+async function processSingleResult(result, magnetUrl, type, imdbId, kitsuId, season, episode) {
+  try {
     // Extract infoHash from magnet link
     const infoHash = extractInfoHash(magnetUrl);
     if (!infoHash) {
@@ -150,7 +158,8 @@ async function processSingleResult(result, type, imdbId, kitsuId, season, episod
       infoHash: infoHash,
       fileIndex: 0, // Default to first file
       title: result.title,
-      size: result.size
+      size: result.size,
+      prowlarrIndexer: result.indexer // Add the indexer name
     };
 
     // Add media identifiers
@@ -177,7 +186,7 @@ async function processSingleResult(result, type, imdbId, kitsuId, season, episod
 }
 
 // Search for content on Prowlarr
-async function searchProwlarr(title, type, season, episode) {
+async function searchProwlarr(title, type, season, episode, selectedIndexerIds = []) {
   if (!PROWLARR_API_KEY) {
     console.error('Prowlarr API key not configured');
     return { error: 'Prowlarr API key not configured' };
@@ -198,14 +207,20 @@ async function searchProwlarr(title, type, season, episode) {
 
     console.log(`Searching Prowlarr for: ${searchQuery} (${type})`);
 
-    const response = await client.get('/api/v1/search', {
-      params: {
-        query: searchQuery,
-        categories: categories.join(','),
-        type: 'search',
-        limit: SEARCH_LIMIT
-      }
-    });
+    const params = {
+      query: searchQuery,
+      categories: categories.join(','),
+      type: 'search',
+      limit: SEARCH_LIMIT
+    };
+
+    // Add indexerIds if provided
+    if (selectedIndexerIds.length > 0) {
+      params.indexerIds = selectedIndexerIds.join(',');
+      console.log(`Searching specific indexers: ${selectedIndexerIds.join(', ')}`);
+    }
+
+    const response = await client.get('/api/v1/search', { params });
 
     if (Array.isArray(response.data) && response.data.length > 0) {
       console.log(`Prowlarr returned ${response.data.length} results`);
@@ -224,7 +239,7 @@ async function searchProwlarr(title, type, season, episode) {
   }
 }
 
-// Process Prowlarr search results and save to database
+// Process search results
 async function processSearchResults(results, type, imdbId, kitsuId, season, episode) {
   if (!Array.isArray(results) || results.length === 0) {
     return [];
@@ -233,20 +248,26 @@ async function processSearchResults(results, type, imdbId, kitsuId, season, epis
   const torrents = [];
   const files = [];
 
-  // Process results in parallel, 10 at a time
+  // Process results in chunks to maintain parallel processing
   const chunks = chunkArray(results, PARALLEL_REQUESTS);
   console.log(`Processing ${results.length} results in ${chunks.length} batches of up to ${PARALLEL_REQUESTS}`);
 
   for (const [index, chunk] of chunks.entries()) {
     console.log(`Processing batch ${index + 1}/${chunks.length} with ${chunk.length} results`);
     
-    // Process each chunk in parallel
-    const chunkResults = await Promise.all(
-      chunk.map(result => processSingleResult(result, type, imdbId, kitsuId, season, episode))
-    );
+    // Get magnet URLs for the chunk in parallel
+    const magnetResults = await getMagnetUrls(chunk);
     
-    // Filter out null results and add to torrents and files arrays
-    for (const result of chunkResults) {
+    // Process all results in the chunk in parallel
+    const processingPromises = magnetResults.map(({ result, magnetUrl }) =>
+      processSingleResult(result, magnetUrl, type, imdbId, kitsuId, season, episode)
+    );
+
+    // Wait for all processing to complete and collect results
+    const processedResults = await Promise.all(processingPromises);
+    
+    // Add valid results to torrents and files arrays
+    for (const result of processedResults) {
       if (result) {
         torrents.push(result.torrent);
         files.push(result.file);
@@ -271,7 +292,7 @@ async function processSearchResults(results, type, imdbId, kitsuId, season, epis
 }
 
 // Main search function that combines searching and processing
-export async function searchContent(title, type, imdbId, kitsuId, season, episode) {
+export async function searchContent(title, type, imdbId, kitsuId, season, episode, selectedProviders = []) {
   // First try to get from database
   let results = [];
   
@@ -303,9 +324,20 @@ export async function searchContent(title, type, imdbId, kitsuId, season, episod
     return results;
   }
 
+  // Refresh providers before searching
+  await refreshProviders();
+
+  // Convert selected providers to indexer IDs
+  const selectedIndexerIds = selectedProviders
+    .map(providerKey => {
+      const provider = Providers.options.find(p => p.key === providerKey);
+      return provider?.prowlarrId;
+    })
+    .filter(id => id !== undefined);
+
   // Otherwise, search Prowlarr
   console.log(`Not enough results in database, searching Prowlarr for ${searchTitle}`);
-  const prowlarrResults = await searchProwlarr(searchTitle, type, season, episode);
+  const prowlarrResults = await searchProwlarr(searchTitle, type, season, episode, selectedIndexerIds);
   
   // If there was an error or no results, return what we have from the database
   if (prowlarrResults.error || !Array.isArray(prowlarrResults) || prowlarrResults.length === 0) {
@@ -335,4 +367,38 @@ export async function searchContent(title, type, imdbId, kitsuId, season, episod
   console.log(`Returning ${combinedResults.length} combined results (${results.length} from DB, ${newResults.length} new)`);
   
   return combinedResults;
+}
+
+// Function to fetch all enabled indexers from Prowlarr
+export async function getIndexers() {
+  if (!PROWLARR_API_KEY) {
+    console.error('Prowlarr API key not configured');
+    throw new Error('Prowlarr API key not configured');
+  }
+
+  try {
+    const client = createProwlarrClient();
+    const response = await client.get('/api/v1/indexer');
+    
+    if (!Array.isArray(response.data)) {
+      console.error('Invalid response from Prowlarr indexer API');
+      return [];
+    }
+    
+    // Filter only enabled indexers
+    const enabledIndexers = response.data.filter(indexer => indexer.enable);
+    
+    console.log(`Found ${enabledIndexers.length} enabled indexers in Prowlarr`);
+    
+    // Map to the format expected by the Providers object
+    return enabledIndexers.map(indexer => ({
+      key: indexer.name.toLowerCase().replace(/\s+/g, ''),
+      label: indexer.name,
+      prowlarrId: indexer.id,
+      prowlarrName: indexer.name
+    }));
+  } catch (error) {
+    console.error('Error fetching Prowlarr indexers:', error.message);
+    throw new Error(`Failed to fetch Prowlarr indexers: ${error.message}`);
+  }
 }
