@@ -18,6 +18,10 @@ export function toStreamInfo(record) {
   const quality = getQuality(record, torrentInfo, fileInfo);
   const three3Quality = fileInfo.threeD || torrentInfo.threeD;
   const hdrProfiles = torrentInfo.hdr || fileInfo.hdr || [];
+  
+  // Use prowlarrIndexer if available, otherwise use torrent.provider
+  const provider = record.prowlarrIndexer || record.torrent.provider;
+  
   const title = joinDetailParts(
       [
         joinDetailParts([record.torrent.title.replace(/[, ]+/g, ' ')]),
@@ -25,7 +29,7 @@ export function toStreamInfo(record) {
         joinDetailParts([
           joinDetailParts([record.torrent.seeders], '👤 '),
           joinDetailParts([formatSize(record.size)], '💾 '),
-          joinDetailParts([record.torrent.provider], '⚙️ ')
+          joinDetailParts([provider], '⚙️ ')
         ]),
         joinDetailParts(getLanguages(record, torrentInfo, fileInfo), '', ' / '),
       ],
