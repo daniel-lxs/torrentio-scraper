@@ -31,8 +31,15 @@ const keysToUppercase = [SizeFilter.key];
 
 export function parseConfiguration(configuration) {
   if (!configuration) {
-    return undefined;
+    return {};
   }
+  
+  // Check if Prowlarr is required but not configured
+  if (!process.env.PROWLARR_API_KEY) {
+    console.error('[ERROR] Prowlarr API key not configured. This app requires Prowlarr to function.');
+    throw new Error('Prowlarr API key not configured. This app requires Prowlarr to function.');
+  }
+
   if (PreConfigurations[configuration]) {
     return PreConfigurations[configuration].config;
   }
@@ -53,9 +60,7 @@ export function parseConfiguration(configuration) {
 
 function liteConfig() {
   const config = {};
-  config[Providers.key] = Providers.options
-      .filter(provider => !provider.foreign)
-      .map(provider => provider.key);
+  config[Providers.key] = Providers.options.map(provider => provider.key);
   config[QualityFilter.key] = ['scr', 'cam']
   config['limit'] = 1;
   return config;
@@ -63,9 +68,7 @@ function liteConfig() {
 
 function brazucaConfig() {
   const config = {};
-  config[Providers.key] = Providers.options
-      .filter(provider => !provider.foreign || provider.foreign === '🇵🇹')
-      .map(provider => provider.key);
+  config[Providers.key] = Providers.options.map(provider => provider.key);
   config[LanguageOptions.key] = ['portuguese'];
   return config;
 }
