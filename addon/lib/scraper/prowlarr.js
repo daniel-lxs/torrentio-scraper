@@ -71,38 +71,57 @@ function chunkArray(array, chunkSize) {
 
 // Process downloadUrls in parallel to get magnet URLs
 async function getMagnetUrls(results) {
-  // Filter out results without downloadUrl first
+  // Filter out results without any usable properties
   const validResults = results.filter(result => {
-    if (!result.downloadUrl) {
-      console.log(`No downloadUrl for result: ${result.title}`);
+    if (!result.infoHash && !result.magnetUrl && !result.downloadUrl) {
+      console.log(`No infoHash, magnetUrl, or downloadUrl for result: ${result.title}`);
       return false;
     }
     return true;
   });
 
-  // Process all downloadUrls in parallel
+  // Process all results in parallel
   const promises = validResults.map(async result => {
     try {
-      console.log(`Getting magnet link from downloadUrl: ${result.downloadUrl}`);
-      
-      // Make a GET request without following redirects
-      const response = await axios.get(result.downloadUrl, {
-        maxRedirects: 0,
-        headers: {
-          'User-Agent': 'curl/8.12.1' // Match curl's UA
-        }
-      });
-      
-      // Check for Location header (case insensitive)
-      const location = response.headers.location || response.headers.Location;
-      
-      if (location && location.startsWith('magnet:')) {
-        console.log(`Successfully obtained magnet link from redirect header`);
-        return { result, magnetUrl: location };
-      } else {
-        console.log(`No magnet link in Location header: ${JSON.stringify(response.headers)}`);
-        return null;
+      // Priority 1: Use infoHash if available
+      if (result.infoHash) {
+        console.log(`Using provided infoHash directly: ${result.infoHash} for: ${result.title}`);
+        // Create a magnet URI with the infoHash
+        const magnetUrl = `magnet:?xt=urn:btih:${result.infoHash}&dn=${encodeURIComponent(result.title)}`;
+        return { result, magnetUrl };
       }
+      
+      // Priority 2: Use magnetUrl if available
+      if (result.magnetUrl) {
+        console.log(`Using provided magnetUrl directly for: ${result.title}`);
+        return { result, magnetUrl: result.magnetUrl };
+      }
+      
+      // Priority 3: Fall back to downloadUrl
+      if (result.downloadUrl) {
+        console.log(`Getting magnet link from downloadUrl: ${result.downloadUrl}`);
+        
+        // Make a GET request without following redirects
+        const response = await axios.get(result.downloadUrl, {
+          maxRedirects: 0,
+          headers: {
+            'User-Agent': 'curl/8.12.1' // Match curl's UA
+          }
+        });
+        
+        // Check for Location header (case insensitive)
+        const location = response.headers.location || response.headers.Location;
+        
+        if (location && location.startsWith('magnet:')) {
+          console.log(`Successfully obtained magnet link from redirect header`);
+          return { result, magnetUrl: location };
+        } else {
+          console.log(`No magnet link in Location header: ${JSON.stringify(response.headers)}`);
+          return null;
+        }
+      }
+      
+      return null;
     } catch (error) {
       // Even in case of error, check if we got a redirect in the error response
       if (error.response && error.response.headers) {
@@ -125,10 +144,15 @@ async function getMagnetUrls(results) {
 // Process a single result with a magnet URL
 async function processSingleResult(result, magnetUrl, type, imdbId, kitsuId, season, episode) {
   try {
-    // Extract infoHash from magnet link
-    const infoHash = extractInfoHash(magnetUrl);
+    // Use infoHash from result if available, otherwise extract from magnet link
+    let infoHash = result.infoHash;
+    
+    if (!infoHash && magnetUrl) {
+      infoHash = extractInfoHash(magnetUrl);
+    }
+    
     if (!infoHash) {
-      console.log(`Could not extract infoHash from magnet link for: ${result.title}`);
+      console.log(`Could not obtain infoHash for: ${result.title}`);
       return null;
     }
 
@@ -138,17 +162,25 @@ async function processSingleResult(result, magnetUrl, type, imdbId, kitsuId, sea
     const parsedTitle = parseTorrentTitle(result.title);
     const now = new Date();
     
+    // Handle torrentId - if guid is a magnet URL or too long, use the infoHash instead
+    let torrentId = result.guid;
+    if (torrentId && (torrentId.startsWith('magnet:') || torrentId.length > 500)) {
+      // If guid is a magnet URL or too long, use the infoHash as the torrentId
+      torrentId = infoHash;
+      console.log(`Using infoHash as torrentId because original guid is too long or is a magnet URL`);
+    }
+    
     // Create torrent record
     const torrent = {
       infoHash: infoHash,
       provider: result.indexer,
-      torrentId: result.guid,
+      torrentId: torrentId,
       title: result.title,
       size: result.size,
       type: type,
       uploadDate: result.publishDate || now,
       seeders: result.seeders || 0,
-      trackers: magnetUrl.match(/tr=([^&]+)/g)?.join(',') || '',
+      trackers: magnetUrl?.match(/tr=([^&]+)/g)?.join(',') || '',
       languages: parsedTitle.languages?.join(',') || '',
       resolution: parsedTitle.resolution || ''
     };

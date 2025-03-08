@@ -80,6 +80,17 @@ const Subtitle = database.define('subtitle',
     { timestamps: false }
 );
 
+// API Key model for authentication
+const ApiKey = database.define('apiKey',
+    {
+      key: { type: Sequelize.STRING(64), primaryKey: true },
+      name: { type: Sequelize.STRING(128), allowNull: false },
+      createdAt: { type: Sequelize.DATE, defaultValue: Sequelize.NOW },
+      lastUsed: { type: Sequelize.DATE },
+      isActive: { type: Sequelize.BOOLEAN, defaultValue: true }
+    }
+);
+
 Torrent.hasMany(File, { foreignKey: 'infoHash', constraints: false });
 File.belongsTo(Torrent, { foreignKey: 'infoHash', constraints: false });
 File.hasMany(Subtitle, { foreignKey: 'fileId', constraints: false });
@@ -88,15 +99,12 @@ Subtitle.belongsTo(File, { foreignKey: 'fileId', constraints: false });
 // Initialize database
 export async function initDatabase() {
   try {
-    await database.authenticate();
-    console.log('Database connection has been established successfully.');
-    
-    // Sync models with database
-    await database.sync();
-    console.log('Database models synchronized successfully.');
-    
-    // Alter column size if needed
     await alterTorrentIdColumnSize();
+    await database.authenticate();
+    await Torrent.sync();
+    await File.sync();
+    await ApiKey.sync(); // Add API Key model sync
+    console.log('Database connection has been established successfully.');
     
     return true;
   } catch (error) {
@@ -178,6 +186,18 @@ export async function saveTorrentsAndFiles(torrents, files) {
   try {
     // Insert torrents with upsert (update if exists)
     for (const torrent of torrents) {
+      // Ensure torrentId doesn't exceed database column size limit
+      if (torrent.torrentId && torrent.torrentId.length > 512) {
+        console.log(`Trimming torrentId for ${torrent.title} from ${torrent.torrentId.length} to 512 characters`);
+        // If it's not a magnet URL, simply trim it
+        if (!torrent.torrentId.startsWith('magnet:')) {
+          torrent.torrentId = torrent.torrentId.substring(0, 512);
+        } else {
+          // If it's a magnet URL, use the infoHash instead
+          torrent.torrentId = torrent.infoHash;
+        }
+      }
+      
       await Torrent.upsert(torrent, { transaction });
     }
     
@@ -210,4 +230,58 @@ export async function saveTorrentsAndFiles(torrents, files) {
     console.error('Error saving torrents and files:', error);
     throw error;
   }
+}
+
+// API Key functions
+export async function createApiKey(name) {
+  // Generate a random API key
+  const key = Array(64)
+    .fill(0)
+    .map(() => Math.random().toString(36).charAt(2))
+    .join('');
+  
+  // Save to database
+  await ApiKey.create({
+    key,
+    name,
+    createdAt: new Date(),
+    lastUsed: null,
+    isActive: true
+  });
+  
+  return key;
+}
+
+export async function validateApiKey(key) {
+  if (!key) return false;
+  
+  const apiKey = await ApiKey.findOne({
+    where: {
+      key,
+      isActive: true
+    }
+  });
+  
+  if (apiKey) {
+    // Update last used timestamp
+    await apiKey.update({ lastUsed: new Date() });
+    return true;
+  }
+  
+  return false;
+}
+
+export async function listApiKeys() {
+  return await ApiKey.findAll({
+    attributes: ['key', 'name', 'createdAt', 'lastUsed', 'isActive']
+  });
+}
+
+export async function deactivateApiKey(key) {
+  const apiKey = await ApiKey.findByPk(key);
+  if (apiKey) {
+    await apiKey.update({ isActive: false });
+    return true;
+  }
+  return false;
 }

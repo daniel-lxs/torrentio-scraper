@@ -11,9 +11,9 @@ import StaticLinks from './moch/static.js';
 import { createNamedQueue } from "./lib/namedQueue.js";
 import pLimit from "p-limit";
 import { searchContent } from './lib/scraper/prowlarr.js';
-import nameToImdb from 'name-to-imdb';
 import axios from 'axios';
 import { setTimeout } from 'timers/promises';
+import { getImdbMetadata } from './lib/imdb.js';
 
 const CACHE_MAX_AGE = parseInt(process.env.CACHE_MAX_AGE) || 60 * 60; // 1 hour in seconds
 const CACHE_MAX_AGE_EMPTY = 60; // 60 seconds
@@ -26,15 +26,9 @@ const builder = new addonBuilder(dummyManifest());
 const requestQueue = createNamedQueue(Infinity);
 const newLimiter = pLimit(30)
 
-// Custom implementation of nameToImdbPromise that properly handles the callback
+// Custom implementation of nameToImdbPromise that uses our getImdbMetadata function
 function nameToImdbPromise(imdbId) {
-  return new Promise((resolve, reject) => {
-    nameToImdb(imdbId, (err, id, info) => {
-      if (err) return reject(err);
-      if (!info || !info.meta) return reject(new Error('No metadata found'));
-      resolve(info.meta);
-    });
-  });
+  return getImdbMetadata(imdbId);
 }
 
 // Function to get title from OMDB API
