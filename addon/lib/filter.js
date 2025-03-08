@@ -1,6 +1,10 @@
-import { extractProvider, parseSize, extractSize } from './titleHelper.js';
+import { parseSize, extractSize } from './titleHelper.js';
 import { Type } from './types.js';
-export const Providers = {
+import { getIndexers } from './scraper/prowlarr.js';
+import { setTimeout, setInterval } from 'timers/promises';
+
+// Legacy providers list - will be used as fallback if Prowlarr is not available
+export const LegacyProviders = {
   key: 'providers',
   options: [
     {
@@ -107,6 +111,68 @@ export const Providers = {
     },
   ]
 };
+
+// Initialize Providers with legacy options, will be updated with Prowlarr indexers
+export const Providers = {
+  key: 'providers',
+  options: [...LegacyProviders.options],
+  lastUpdate: 0, // Timestamp of last update
+  updating: false // Flag to prevent concurrent updates
+};
+
+// Cache duration in milliseconds (5 minutes)
+const PROVIDER_CACHE_DURATION = 5 * 60 * 1000;
+
+// Function to check if providers need refresh
+function needsRefresh() {
+  const now = Date.now();
+  return now - Providers.lastUpdate > PROVIDER_CACHE_DURATION;
+}
+
+// Function to refresh providers
+export async function refreshProviders(force = false) {
+  // If already updating, wait for it to finish
+  if (Providers.updating) {
+    console.log('[INFO] Provider refresh already in progress, waiting...');
+    while (Providers.updating) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return;
+  }
+
+  // Check if refresh is needed
+  if (!force && !needsRefresh()) {
+    return;
+  }
+
+  try {
+    Providers.updating = true;
+    console.log('[INFO] Refreshing Prowlarr providers...');
+    const indexers = await getIndexers();
+    
+    if (indexers && indexers.length > 0) {
+      Providers.options = indexers;
+      Providers.lastUpdate = Date.now();
+      console.log(`[INFO] Successfully refreshed ${indexers.length} providers from Prowlarr`);
+    } else {
+      console.warn('[WARN] No indexers found in Prowlarr during refresh');
+    }
+  } catch (error) {
+    console.error(`[ERROR] Failed to refresh providers from Prowlarr: ${error.message}`);
+  } finally {
+    Providers.updating = false;
+  }
+}
+
+// Set up periodic refresh (every 5 minutes)
+if (process.env.PROWLARR_API_KEY) {
+  setInterval(() => refreshProviders(), PROVIDER_CACHE_DURATION);
+  // Initial refresh
+  refreshProviders(true).catch(error => {
+    console.error(`[ERROR] Error during initial provider refresh: ${error.message}`);
+  });
+}
+
 export const QualityFilter = {
   key: 'qualityfilter',
   options: [
@@ -224,53 +290,22 @@ export const QualityFilter = {
     }
   ]
 };
+
 export const SizeFilter = {
   key: 'sizefilter'
 }
-const defaultProviderKeys = Providers.options.map(provider => provider.key);
+
 
 export default function applyFilters(streams, config) {
   return [
-    filterByProvider,
     filterByQuality,
     filterBySize
   ].reduce((filteredStreams, filter) => filter(filteredStreams, config), streams);
 }
 
-function filterByProvider(streams, config) {
-  // If we're using Prowlarr, skip provider filtering
-  if (process.env.PROWLARR_API_KEY) {
-    console.log(`[DEBUG] Skipping provider filtering because Prowlarr is enabled`);
-    return streams;
-  }
-  
-  const providers = config.providers || defaultProviderKeys;
-  if (!providers?.length) {
-    return streams;
-  }
-  
-  console.log(`[DEBUG] Filtering by providers: ${providers.join(', ')}`);
-  return streams.filter(stream => {
-    const provider = extractProvider(stream.title)?.toLowerCase();
-    if (!provider) {
-      console.log(`[DEBUG] No provider found in stream title: ${stream.title}`);
-      return true; // Include streams with no provider
-    }
-    const included = providers.includes(provider);
-    if (!included) {
-      console.log(`[DEBUG] Provider ${provider} not in allowed list`);
-    }
-    return included;
-  });
-}
+
 
 function filterByQuality(streams, config) {
-  // If we're using Prowlarr, skip quality filtering
-  if (process.env.PROWLARR_API_KEY) {
-    console.log(`[DEBUG] Skipping quality filtering because Prowlarr is enabled`);
-    return streams;
-  }
-  
   const filters = config[QualityFilter.key];
   if (!filters) {
     return streams;
@@ -290,12 +325,6 @@ function filterByQuality(streams, config) {
 }
 
 function filterBySize(streams, config) {
-  // If we're using Prowlarr, skip size filtering
-  if (process.env.PROWLARR_API_KEY) {
-    console.log(`[DEBUG] Skipping size filtering because Prowlarr is enabled`);
-    return streams;
-  }
-  
   const sizeFilters = config[SizeFilter.key];
   if (!sizeFilters?.length) {
     return streams;
