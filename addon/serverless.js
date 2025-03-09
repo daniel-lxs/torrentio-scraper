@@ -7,11 +7,21 @@ import addonInterface from './addon.js';
 import qs from 'querystring';
 import { manifest } from './lib/manifest.js';
 import { parseConfiguration, PreConfigurations } from './lib/configuration.js';
-import landingTemplate from './lib/landingTemplate.js';
+import { Providers, QualityFilter } from './lib/filter.js';
+import { SortOptions } from './lib/sort.js';
+import { LanguageOptions } from './lib/languages.js';
+import { DebridOptions } from './moch/options.js';
+import { MochOptions } from './moch/moch.js';
 import * as moch from './moch/moch.js';
 import * as repository from './lib/repository.js';
 import bodyParser from 'body-parser';
 import { Buffer } from 'buffer';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import fs from 'fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const router = new Router();
 const limiter = rateLimit({
@@ -22,6 +32,43 @@ const limiter = rateLimit({
 })
 
 router.use(cors())
+
+// Serve static files
+router.get('/static/:file', (req, res) => {
+  const filePath = join(__dirname, 'static', req.params.file);
+  if (fs.existsSync(filePath)) {
+    const ext = req.params.file.split('.').pop().toLowerCase();
+    const contentTypes = {
+      'js': 'application/javascript',
+      'css': 'text/css',
+      'html': 'text/html',
+      'png': 'image/png',
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'gif': 'image/gif'
+    };
+    res.setHeader('Content-Type', contentTypes[ext] || 'text/plain');
+    res.end(fs.readFileSync(filePath));
+  } else {
+    res.writeHead(404);
+    res.end();
+  }
+});
+
+// Serve configuration options
+router.get('/options', (_, res) => {
+  const options = {
+    providers: Providers.options,
+    sortOptions: Object.values(SortOptions.options),
+    languageOptions: LanguageOptions.options,
+    qualityFilters: Object.values(QualityFilter.options),
+    debridOptions: Object.values(DebridOptions.options),
+    debridProviders: Object.values(MochOptions)
+  };
+  res.setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify(options));
+});
+
 router.get('/', (_, res) => {
   res.redirect('/configure')
   res.end();
@@ -32,11 +79,10 @@ router.get(`/:preconfiguration(${Object.keys(PreConfigurations).join('|')})`, (r
   res.end();
 });
 
-router.get('/:configuration?/configure', (req, res) => {
-  const configValues = parseConfiguration(req.params.configuration || '');
-  const landingHTML = landingTemplate(manifest(configValues), configValues);
+router.get('/:configuration?/configure', (_, res) => {
+  const filePath = join(__dirname, 'static', 'landing.html');
   res.setHeader('content-type', 'text/html');
-  res.end(landingHTML);
+  res.end(fs.readFileSync(filePath));
 });
 
 router.get('/:configuration?/manifest.json', (req, res) => {
