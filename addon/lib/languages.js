@@ -9,7 +9,7 @@ const languageMapping = {
   'italian': '🇮🇹',
   'portuguese': '🇵🇹',
   'spanish': '🇪🇸',
-  'latino': '🇲🇽',
+  'latin,latino': '🇲🇽',
   'korean': '🇰🇷',
   'chinese': '🇨🇳',
   'taiwanese': '🇹🇼',
@@ -67,7 +67,13 @@ export function mapLanguages(languages) {
 }
 
 export function containsLanguage(stream, languages) {
-  return languages.map(lang => languageMapping[lang]).some(lang => stream.title.toLowerCase().includes(lang?.toLowerCase()));
+  return languages.map(lang => {
+    const codes = lang.split(',');
+    if (codes.length > 1) {
+      return codes.map(code => languageMapping[code.trim()]);
+    }
+    return languageMapping[lang];
+  }).flat().some(lang => stream.title.toLowerCase().includes(lang?.toLowerCase()));
 }
 
 export function languageFromCode(code) {
