@@ -15,7 +15,7 @@ export function manifest(config = {}) {
     catalogs: getCatalogs(config),
     resources: getResources(config),
     types: [Type.MOVIE, Type.SERIES, Type.ANIME, Type.OTHER],
-    logo: `/static/logo.jpeg`,
+    logo: `https://mirador.darknimbus.top/static/logo.jpeg`,
     behaviorHints: {
       configurable: true,
       configurationRequired: false
@@ -53,7 +53,7 @@ function getDescription(config) {
   const mochsDesc = enabledMochs ? ` and ${enabledMochs} enabled` : '';
   return 'Provides torrent streams from your Prowlarr indexers.'
       + ` Currently supports ${enabledProvidersDesc}${mochsDesc}.`
-      + ` To configure providers, ${possibleMochs} support and other settings visit https://torrentio.strem.fun` // TODO: change to whatever the landing page is
+      + ` To configure providers, ${possibleMochs} support and other settings visit https://mirador.darknimbus.top/` // TODO: change to whatever the landing page is
 }
 
 function getCatalogs(config) {
