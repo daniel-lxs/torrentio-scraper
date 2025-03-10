@@ -6,7 +6,7 @@ import userAgentParser from 'ua-parser-js';
 import addonInterface from './addon.js';
 import qs from 'querystring';
 import { manifest } from './lib/manifest.js';
-import { parseConfiguration, PreConfigurations } from './lib/configuration.js';
+import { parseConfiguration } from './lib/configuration.js';
 import { Providers, QualityFilter } from './lib/filter.js';
 import { SortOptions } from './lib/sort.js';
 import { LanguageOptions } from './lib/languages.js';
@@ -71,11 +71,6 @@ router.get('/options', (_, res) => {
 
 router.get('/', (_, res) => {
   res.redirect('/configure')
-  res.end();
-});
-
-router.get(`/:preconfiguration(${Object.keys(PreConfigurations).join('|')})`, (req, res) => {
-  res.redirect(`/${req.params.preconfiguration}/configure`)
   res.end();
 });
 
