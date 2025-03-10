@@ -2,84 +2,104 @@
 // Initialize the page when the document is ready
 $(document).ready(async function() {
     try {
-        // Fetch manifest data
-        const [manifestResponse, optionsResponse] = await Promise.all([
-            fetch('/manifest.json'),
-            fetch('/options')
-        ]);
+        await refreshUI();
         
-        const [manifest, options] = await Promise.all([
-            manifestResponse.json(),
-            optionsResponse.json()
-        ]);
-        
-        // Update page with manifest data
-        document.title = `${manifest.name} - Stremio Addon`;
-        document.getElementById('addon-name').textContent = manifest.name;
-        document.getElementById('addon-version').textContent = manifest.version || '0.0.0';
-        document.getElementById('addon-description').textContent = manifest.description || '';
-        document.getElementById('addon-logo').src = manifest.logo || 'https://dl.strem.io/addon-logo.png';
-        document.getElementById('favicon').href = manifest.logo || 'https://dl.strem.io/addon-logo.png';
-        // Background image removed for cleaner design
-        
-        // Update addon types
-        const stylizedTypes = manifest.types.map(t => t[0].toUpperCase() + t.slice(1) + (t !== 'series' ? 's' : ''));
-        document.getElementById('addon-types').innerHTML = stylizedTypes.map(t => `<li>${t}</li>`).join('');
-        
-        // Populate providers dropdown
-        const providersHtml = options.providers.map(provider => {
-            if (provider.prowlarrId) {
-                return `<option value="${provider.key}">🔍 ${provider.label}</option>`;
-            }
-            return `<option value="${provider.key}">${provider.foreign ? provider.foreign + ' ' : ''}${provider.label}</option>`;
-        }).join('\n');
-        $('#iProviders').html(providersHtml);
-        
-        // Populate sort options
-        const sortOptionsHtml = options.sortOptions.map((option, i) => 
-            `<option value="${option.key}" ${i === 0 ? 'selected' : ''}>${option.description}</option>`
-        ).join('\n');
-        $('#iSort').html(sortOptionsHtml);
-        
-        // Populate language options
-        const languagesHtml = options.languageOptions.map(option => 
-            `<option value="${option.key}">${option.label}</option>`
-        ).join('\n');
-        $('#iLanguages').html(languagesHtml);
-        
-        // Populate quality filters
-        const qualityFiltersHtml = options.qualityFilters.map(option => 
-            `<option value="${option.key}">${option.label}</option>`
-        ).join('\n');
-        $('#iQualityFilter').html(qualityFiltersHtml);
-        
-        // Populate debrid providers
-        const debridProvidersHtml = options.debridProviders.map(moch => 
-            `<option value="${moch.key}">${moch.name}</option>`
-        ).join('\n');
-        $('#iDebridProviders').append(debridProvidersHtml);
-        
-        // Populate debrid options
-        const debridOptionsHtml = options.debridOptions.map(option => 
-            `<option value="${option.key}">${option.description}</option>`
-        ).join('\n');
-        $('#iDebridOptions').html(debridOptionsHtml);
-        
-        // Initialize multiselect components
-        initializeMultiselect();
-        
-        // Parse configuration from URL if any
-        const config = parseConfigFromUrl();
-        populateFormWithConfig(config);
-        
-        // Generate initial install link
-        generateInstallLink();
-        debridProvidersChange();
+        // Set up periodic refresh every 5 minutes
+        window.setInterval(async () => {
+            await refreshUI();
+        }, 5 * 60 * 1000);
     } catch (error) {
         console.error('Failed to initialize landing page:', error);
         document.body.innerHTML = '<div style="color: white; text-align: center; margin: 20px;">Failed to load addon configuration. Please try refreshing the page.</div>';
     }
 });
+
+// Function to refresh the UI with latest data
+async function refreshUI() {
+    // Fetch manifest data
+    const [manifestResponse, optionsResponse] = await Promise.all([
+        fetch('/manifest.json'),
+        fetch('/options')
+    ]);
+    
+    const [manifest, options] = await Promise.all([
+        manifestResponse.json(),
+        optionsResponse.json()
+    ]);
+    
+    // Update page with manifest data
+    document.title = `${manifest.name} - Stremio Addon`;
+    document.getElementById('addon-name').textContent = manifest.name;
+    document.getElementById('addon-version').textContent = manifest.version || '0.0.0';
+    document.getElementById('addon-description').textContent = manifest.description || '';
+    document.getElementById('addon-logo').src = manifest.logo || 'https://dl.strem.io/addon-logo.png';
+    document.getElementById('favicon').href = manifest.logo || 'https://dl.strem.io/addon-logo.png';
+    
+    // Update addon types
+    const stylizedTypes = manifest.types.map(t => t[0].toUpperCase() + t.slice(1) + (t !== 'series' ? 's' : ''));
+    document.getElementById('addon-types').innerHTML = stylizedTypes.map(t => `<li>${t}</li>`).join('');
+    
+    // Store current selections before updating
+    const currentProviders = $('#iProviders').val() || [];
+    
+    // Populate providers dropdown
+    const providersHtml = options.providers.map(provider => {
+        if (provider.prowlarrId) {
+            return `<option value="${provider.key}">🔍 ${provider.label}</option>`;
+        }
+        return `<option value="${provider.key}">${provider.foreign ? provider.foreign + ' ' : ''}${provider.label}</option>`;
+    }).join('\n');
+    $('#iProviders').html(providersHtml);
+    
+    // Restore previous selections if they still exist in the new options
+    $('#iProviders').val(currentProviders);
+    
+    // Populate sort options
+    const sortOptionsHtml = options.sortOptions.map((option, i) => 
+        `<option value="${option.key}" ${i === 0 ? 'selected' : ''}>${option.description}</option>`
+    ).join('\n');
+    $('#iSort').html(sortOptionsHtml);
+    
+    // Populate language options
+    const languagesHtml = options.languageOptions.map(option => 
+        `<option value="${option.key}">${option.label}</option>`
+    ).join('\n');
+    $('#iLanguages').html(languagesHtml);
+    
+    // Populate quality filters
+    const qualityFiltersHtml = options.qualityFilters.map(option => 
+        `<option value="${option.key}">${option.label}</option>`
+    ).join('\n');
+    $('#iQualityFilter').html(qualityFiltersHtml);
+    
+    // Populate debrid providers
+    const debridProvidersHtml = options.debridProviders.map(moch => 
+        `<option value="${moch.key}">${moch.name}</option>`
+    ).join('\n');
+    $('#iDebridProviders').html('<option value="none" selected>None</option>' + debridProvidersHtml);
+    
+    // Populate debrid options
+    const debridOptionsHtml = options.debridOptions.map(option => 
+        `<option value="${option.key}">${option.description}</option>`
+    ).join('\n');
+    $('#iDebridOptions').html(debridOptionsHtml);
+    
+    // Refresh multiselect components
+    if ($.fn.multiselect) {
+        $('#iProviders').multiselect('refresh');
+        $('#iLanguages').multiselect('refresh');
+        $('#iQualityFilter').multiselect('refresh');
+        $('#iDebridOptions').multiselect('refresh');
+    }
+    
+    // Parse configuration from URL if any
+    const config = parseConfigFromUrl();
+    populateFormWithConfig(config);
+    
+    // Generate initial install link
+    generateInstallLink();
+    debridProvidersChange();
+}
 
 function initializeMultiselect() {
     const isTvMedia = window.matchMedia("tv").matches;
