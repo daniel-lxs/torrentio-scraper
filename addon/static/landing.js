@@ -20,7 +20,7 @@ $(document).ready(async function() {
         document.getElementById('addon-description').textContent = manifest.description || '';
         document.getElementById('addon-logo').src = manifest.logo || 'https://dl.strem.io/addon-logo.png';
         document.getElementById('favicon').href = manifest.logo || 'https://dl.strem.io/addon-logo.png';
-        document.body.style.backgroundImage = `url(${manifest.background || 'https://dl.strem.io/addon-background.jpg'})`;
+        // Background image removed for cleaner design
         
         // Update addon types
         const stylizedTypes = manifest.types.map(t => t[0].toUpperCase() + t.slice(1) + (t !== 'series' ? 's' : ''));

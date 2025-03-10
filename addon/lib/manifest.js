@@ -1,30 +1,27 @@
 import { MochOptions } from '../moch/moch.js';
 import { Providers } from './filter.js';
 import { showDebridCatalog } from '../moch/options.js';
-import { getManifestOverride } from './configuration.js';
 import { Type } from './types.js';
 
 const DefaultProviders = Providers.options.map(provider => provider.key);
 const MochProviders = Object.values(MochOptions);
 
 export function manifest(config = {}) {
-  const overrideManifest = getManifestOverride(config);
   const baseManifest = {
-    id: 'com.stremio.torrentio.addon',
+    id: 'com.stremio.mirador.addon',
     version: '0.0.14',
-    name: getName(overrideManifest, config),
+    name: getName(config),
     description: getDescription(config),
     catalogs: getCatalogs(config),
     resources: getResources(config),
     types: [Type.MOVIE, Type.SERIES, Type.ANIME, Type.OTHER],
-    background: `https://i.ibb.co/VtSfFP9/t8wVwcg.jpg`,
-    logo: `https://i.ibb.co/w4BnkC9/GwxAcDV.png`,
+    logo: `/static/logo.jpeg`,
     behaviorHints: {
       configurable: true,
       configurationRequired: false
     }
   };
-  return Object.assign(baseManifest, overrideManifest);
+  return baseManifest
 }
 
 export function dummyManifest() {
@@ -34,8 +31,8 @@ export function dummyManifest() {
   return manifestDefault;
 }
 
-function getName(manifest, config) {
-  const rootName = manifest?.name || 'Torrentio';
+function getName(config) {
+  const rootName = 'Mirador';
   const mochSuffix = MochProviders
       .filter(moch => config[moch.key])
       .map(moch => moch.shortName)
@@ -54,9 +51,9 @@ function getDescription(config) {
       .join(' & ');
   const possibleMochs = MochProviders.map(moch => moch.name).join('/')
   const mochsDesc = enabledMochs ? ` and ${enabledMochs} enabled` : '';
-  return 'Provides torrent streams from scraped torrent providers.'
+  return 'Provides torrent streams from your Prowlarr indexers.'
       + ` Currently supports ${enabledProvidersDesc}${mochsDesc}.`
-      + ` To configure providers, ${possibleMochs} support and other settings visit https://torrentio.strem.fun`
+      + ` To configure providers, ${possibleMochs} support and other settings visit https://torrentio.strem.fun` // TODO: change to whatever the landing page is
 }
 
 function getCatalogs(config) {

@@ -2,9 +2,10 @@
 <html>
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Torrentio - Stremio Addon</title>
     <link rel="shortcut icon" id="favicon" href="https://dl.strem.io/addon-logo.png" type="image/x-icon">
-    <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,600,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Inter:400,500,600,700&display=swap" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.6.4.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
@@ -21,65 +22,65 @@
             margin: 0;
             padding: 0;
             width: 100%;
-            height: 100%
-        }
-
-        html {
-            background-size: auto 100%;
-            background-size: cover;
-            background-position: center center;
-            background-repeat: repeat-y;
+            height: 100%;
         }
 
         body {
             display: flex;
-            background-color: transparent;
-            font-family: 'Open Sans', Arial, sans-serif;
-            color: white;
+            background-color: #121212;
+            font-family: 'Inter', sans-serif;
+            color: #e0e0e0;
+            line-height: 1.6;
         }
 
         h1 {
-            font-size: 4.5vh;
+            font-size: 2.5rem;
             font-weight: 700;
+            color: #ffffff;
         }
 
         h2 {
-            font-size: 2.2vh;
+            font-size: 1.2rem;
             font-weight: normal;
             font-style: italic;
             opacity: 0.8;
+            color: #b0b0b0;
         }
 
         h3 {
-            font-size: 2.2vh;
+            font-size: 1.2rem;
+            color: #ffffff;
+            margin-bottom: 0.8rem;
         }
 
-        h1,
-        h2,
-        h3,
-        p,
-        label {
+        h1, h2, h3, p, label {
             margin: 0;
-            text-shadow: 0 0 1vh rgba(0, 0, 0, 0.15);
         }
 
         p {
-            font-size: 1.75vh;
+            font-size: 1rem;
         }
 
         ul {
-            font-size: 1.75vh;
+            font-size: 1rem;
             margin: 0;
-            margin-top: 1vh;
-            padding-left: 3vh;
+            margin-top: 0.5rem;
+            padding-left: 1.5rem;
+            color: #b0b0b0;
         }
 
         a {
-            color: green
+            color: #8A5AAB;
+            transition: color 0.2s ease;
+        }
+
+        a:hover {
+            color: #9d6dc4;
+            text-decoration: none;
         }
 
         a.install-link {
-            text-decoration: none
+            text-decoration: none;
         }
 
         .install-button {
@@ -87,43 +88,51 @@
             outline: 0;
             color: white;
             background: #8A5AAB;
-            padding: 1.2vh 3.5vh;
+            padding: 0.8rem 2rem;
             margin: auto;
             text-align: center;
-            font-family: 'Open Sans', Arial, sans-serif;
-            font-size: 2.2vh;
+            font-family: 'Inter', sans-serif;
+            font-size: 1.1rem;
             font-weight: 600;
             cursor: pointer;
             display: block;
-            box-shadow: 0 0.5vh 1vh rgba(0, 0, 0, 0.2);
-            transition: box-shadow 0.1s ease-in-out;
+            border-radius: 4px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
         }
 
         .install-button:hover {
-            box-shadow: none;
+            background: #9d6dc4;
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+            transform: translateY(-2px);
         }
 
         .install-button:active {
-            box-shadow: 0 0 0 0.5vh white inset;
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         #addon {
-            width: 90vh;
+            width: 100%;
+            max-width: 800px;
             margin: auto;
-            padding-left: 10%;
-            padding-right: 10%;
-            background: rgba(0, 0, 0, 0.60);
+            padding: 2rem;
+            background: #1e1e1e;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
         }
 
         .logo {
-            height: 14vh;
-            width: 14vh;
+            height: 100px;
+            width: 100px;
             margin: auto;
-            margin-bottom: 3vh;
+            margin-bottom: 1.5rem;
         }
 
         .logo img {
             width: 100%;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
 
         .name, .version {
@@ -132,38 +141,41 @@
         }
 
         .name {
-            line-height: 5vh;
+            line-height: 2.5rem;
         }
 
         .version {
-            position: absolute;
-            line-height: 5vh;
-            margin-left: 1vh;
-            opacity: 0.8;
+            position: relative;
+            line-height: 2.5rem;
+            margin-left: 0.5rem;
+            opacity: 0.7;
         }
 
         .contact {
-            left: 0;
-            bottom: 4vh;
             width: 100%;
-            margin-top: 1vh;
+            margin-top: 1rem;
             text-align: center;
+            color: #888888;
         }
 
         .contact a {
-            font-size: 1.4vh;
+            font-size: 0.9rem;
             font-style: italic;
         }
 
         .separator {
-            margin-bottom: 4vh;
+            margin: 1.5rem 0;
+            border-top: 1px solid #333333;
         }
 
         .label {
-            font-size: 2.2vh;
+            font-size: 1rem;
             font-weight: 600;
             padding: 0;
             line-height: inherit;
+            color: #ffffff;
+            margin-bottom: 0.5rem;
+            display: block;
         }
 
         .btn-group, .multiselect-container {
@@ -176,25 +188,61 @@
 
         .multiselect-container {
             border: 0;
-            border-radius: 0;
+            border-radius: 4px;
+            background-color: #2a2a2a;
+        }
+
+        .multiselect-container li a label {
+            color: #e0e0e0;
         }
 
         .input, .btn {
             width: 100%;
             margin: auto;
-            margin-bottom: 10px;
-            padding: 6px 12px;
-            border: 0;
-            border-radius: 0;
+            margin-bottom: 1rem;
+            padding: 0.6rem 1rem;
+            border: 1px solid #333333;
+            border-radius: 4px;
             outline: 0;
-            color: #333;
-            background-color: rgb(255, 255, 255);
-            box-shadow: 0 0.5vh 1vh rgba(0, 0, 0, 0.2);
+            color: #e0e0e0;
+            background-color: #2a2a2a;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
         }
 
         .input:focus, .btn:focus {
             outline: none;
-            box-shadow: 0 0 0 2pt rgb(30, 144, 255, 0.7);
+            border-color: #8A5AAB;
+            box-shadow: 0 0 0 2px rgba(138, 90, 171, 0.25);
+        }
+
+        .input::placeholder {
+            color: #888888;
+        }
+
+        .dropdown-menu {
+            background-color: #2a2a2a;
+            border: 1px solid #333333;
+        }
+
+        .dropdown-item {
+            color: #e0e0e0;
+        }
+
+        .dropdown-item:hover, .dropdown-item:focus {
+            background-color: #333333;
+            color: #ffffff;
+        }
+
+        @media (max-width: 768px) {
+            #addon {
+                width: 95%;
+                padding: 1.5rem;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
         }
     </style>
 </head>
@@ -287,7 +335,7 @@
         <div id="dApiKey">
             <label class="label" for="iApiKey">API Key (Required):</label>
             <input type="text" id="iApiKey" onchange="generateInstallLink()" class="input" placeholder="Enter your API key" required>
-            <p style="font-size: 1.4vh; margin-bottom: 10px;">This addon requires an API key for authentication. Contact the administrator to get one.</p>
+            <p style="font-size: 0.9rem; margin-bottom: 1rem; color: #b0b0b0;">This addon requires an API key for authentication. Contact the administrator to get one.</p>
         </div>
 
         <div class="separator"></div>
