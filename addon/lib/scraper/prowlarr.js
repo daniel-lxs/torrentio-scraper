@@ -4,6 +4,7 @@ import * as repository from '../repository.js';
 import { extractInfoHash } from '../magnetHelper.js';
 import * as ptt from 'parse-torrent-title';
 import { Providers, refreshProviders } from '../filter.js';
+import { URLSearchParams } from 'url';
 
 // Constants
 const PROWLARR_BASE_URL = process.env.PROWLARR_BASE_URL || 'http://localhost:9696';
@@ -248,11 +249,26 @@ async function searchProwlarr(title, type, season, episode, selectedIndexerIds =
 
     // Add indexerIds if provided
     if (selectedIndexerIds.length > 0) {
-      params.indexerIds = selectedIndexerIds.join(',');
+      // Convert indexerIds array to URLSearchParams format with multiple indexerIds parameters
+      params.indexerIds = selectedIndexerIds;
       console.log(`Searching specific indexers: ${selectedIndexerIds.join(', ')}`);
     }
 
-    const response = await client.get('/api/v1/search', { params });
+    const response = await client.get('/api/v1/search', { 
+      params,
+      paramsSerializer: params => {
+        const searchParams = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+          if (Array.isArray(value)) {
+            // Handle arrays by adding multiple entries with the same key
+            value.forEach(v => searchParams.append(key, v));
+          } else {
+            searchParams.append(key, value);
+          }
+        });
+        return searchParams.toString();
+      }
+    });
 
     if (Array.isArray(response.data) && response.data.length > 0) {
       console.log(`Prowlarr returned ${response.data.length} results`);
