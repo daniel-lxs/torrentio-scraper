@@ -196,7 +196,7 @@ function populateDownloadLinks(streams, results, config) {
     const isCached = cachedEntry?.cached;
     if (!isCached && isHealthyStreamForDebrid(seededStreams, stream)) {
       streams.push({
-        name: `[${mochResult.moch.shortName} download] ${stream.name}`,
+        name: `[${mochResult.moch.shortName}-] ${stream.name}`,
         title: stream.title,
         url: `${config.host}/${mochResult.moch.key}/${cachedEntry.url}/${streamFilename(stream)}`,
         behaviorHints: stream.behaviorHints
