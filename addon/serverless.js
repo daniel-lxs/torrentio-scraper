@@ -7,7 +7,7 @@ import addonInterface from './addon.js';
 import qs from 'querystring';
 import { manifest } from './lib/manifest.js';
 import { parseConfiguration } from './lib/configuration.js';
-import { Providers, QualityFilter } from './lib/filter.js';
+import { Providers, QualityFilter, refreshProviders } from './lib/filter.js';
 import { SortOptions } from './lib/sort.js';
 import { LanguageOptions } from './lib/languages.js';
 import { DebridOptions } from './moch/options.js';
@@ -56,17 +56,26 @@ router.get('/static/:file', (req, res) => {
 });
 
 // Serve configuration options
-router.get('/options', (_, res) => {
-  const options = {
-    providers: Providers.options,
-    sortOptions: Object.values(SortOptions.options),
-    languageOptions: LanguageOptions.options,
-    qualityFilters: Object.values(QualityFilter.options),
-    debridOptions: Object.values(DebridOptions.options),
-    debridProviders: Object.values(MochOptions)
-  };
-  res.setHeader('Content-Type', 'application/json');
-  res.end(JSON.stringify(options));
+router.get('/options', async (_, res) => {
+  try {
+    // Refresh providers using debounce logic
+    await refreshProviders();
+    
+    const options = {
+      providers: Providers.options,
+      sortOptions: Object.values(SortOptions.options),
+      languageOptions: LanguageOptions.options,
+      qualityFilters: Object.values(QualityFilter.options),
+      debridOptions: Object.values(DebridOptions.options),
+      debridProviders: Object.values(MochOptions)
+    };
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify(options));
+  } catch (error) {
+    console.error('Error refreshing providers:', error);
+    res.statusCode = 500;
+    res.end(JSON.stringify({ error: 'Failed to refresh providers' }));
+  }
 });
 
 router.get('/', (_, res) => {
