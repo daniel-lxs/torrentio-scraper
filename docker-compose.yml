@@ -56,6 +56,24 @@ services:
       retries: 10
       start_period: 60s
 
+  # FlareSolverr for bypassing Cloudflare protection
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: torrentio-flaresolverr
+    restart: unless-stopped
+    environment:
+      - LOG_LEVEL=info
+      - TZ=Etc/UTC
+      - CAPTCHA_SOLVER=none
+    ports:
+      - "8191:8191"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8191/v1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
   # Torrentio Addon service
   torrentio-addon:
     build:
@@ -68,6 +86,8 @@ services:
       redis:
         condition: service_healthy
       prowlarr:
+        condition: service_started
+      flaresolverr:
         condition: service_started
     environment:
       - DATABASE_URI=postgres://torrentio_user:torrentio_password@postgres:5432/torrentio
