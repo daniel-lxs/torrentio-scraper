@@ -226,21 +226,21 @@ function blackListToken(token, mochKey) {
 function errorStreamResponse(mochKey, error, config) {
   if (error === BadTokenError) {
     return {
-      name: `Torrentio\n${MochOptions[mochKey].shortName} error`,
+      name: `Mirador\n${MochOptions[mochKey].shortName} error`,
       title: `Invalid ${MochOptions[mochKey].name} ApiKey/Token!`,
       url: `${config.host}/${StaticResponse.FAILED_ACCESS}`
     };
   }
   if (error === AccessDeniedError) {
     return {
-      name: `Torrentio\n${MochOptions[mochKey].shortName} error`,
+      name: `Mirador\n${MochOptions[mochKey].shortName} error`,
       title: `Expired/invalid ${MochOptions[mochKey].name} subscription!`,
       url: `${config.host}/${StaticResponse.FAILED_ACCESS}`
     };
   }
   if (error === AccessBlockedError) {
     return {
-      name: `Torrentio\n${MochOptions[mochKey].shortName} error`,
+      name: `Mirador\n${MochOptions[mochKey].shortName} error`,
       title: `Access to ${MochOptions[mochKey].name} is blocked!\nCheck your account or email.`,
       url: `${config.host}/${StaticResponse.FAILED_ACCESS}`
     };

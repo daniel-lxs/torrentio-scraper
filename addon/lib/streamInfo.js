@@ -4,7 +4,7 @@ import { mapLanguages } from './languages.js';
 import { enrichStreamSources, getSources } from './magnetHelper.js';
 import { getSubtitles } from './subtitles.js';
 
-const ADDON_NAME = 'Torrentio';
+const ADDON_NAME = 'Mirador';
 const SIZE_DELTA = 0.05;
 const UNKNOWN_SIZE = 300000000;
 const CAM_SOURCES = ['CAM', 'TeleSync', 'TeleCine', 'SCR'];
@@ -152,5 +152,6 @@ function getBingeGroupParts(record, sameInfo, quality, torrentInfo, fileInfo) {
 }
 
 function cleanOutputObject(object) {
+  // eslint-disable-next-line no-unused-vars
   return Object.fromEntries(Object.entries(object).filter(([_, v]) => v != null));
 }
