@@ -9,4 +9,4 @@ COPY package*.json ./
 RUN npm install --only=production
 COPY . .
 
-CMD [ "node", "--insecure-http-parser", "index.js" ]
+CMD [ "node", "--insecure-http-parser", "addon/index.js" ]

@@ -59,7 +59,7 @@ services:
   # Torrentio Addon service
   torrentio-addon:
     build:
-      context: ./addon
+      context: ./
     container_name: torrentio-addon
     restart: unless-stopped
     depends_on:

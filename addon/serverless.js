@@ -281,7 +281,7 @@ router.delete('/admin/apikeys/:key', authenticateAdmin, async (req, res) => {
 
 // Admin page route
 router.get('/admin', (req, res) => {
-  res.redirect('/admin.html');
+  res.redirect('static/admin.html');
   res.end();
 });
 
