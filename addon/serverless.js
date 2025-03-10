@@ -154,32 +154,27 @@ const authenticateAdmin = (req, res, next) => {
   const adminPassword = process.env.ADMIN_PASSWORD;
   
   if (!adminUsername || !adminPassword) {
-    console.error('Admin credentials not configured');
-    res.writeHead(500);
+    res.writeHead(401);
     res.end(JSON.stringify({ error: 'Admin credentials not configured' }));
     return;
   }
   
-  // Get credentials from Basic Auth header
+  // For API endpoints, use the Authorization header
   const authHeader = req.headers.authorization || '';
   const match = authHeader.match(/^Basic\s+(.*)$/);
   
-  if (!match) {
-    res.writeHead(401, { 'WWW-Authenticate': 'Basic' });
-    res.end(JSON.stringify({ error: 'Authentication required' }));
-    return;
+  if (match) {
+    const credentials = Buffer.from(match[1], 'base64').toString().split(':');
+    const username = credentials[0];
+    const password = credentials[1];
+    
+    if (username === adminUsername && password === adminPassword) {
+      return next();
+    }
   }
   
-  const credentials = Buffer.from(match[1], 'base64').toString().split(':');
-  const username = credentials[0];
-  const password = credentials[1];
-  
-  if (username === adminUsername && password === adminPassword) {
-    next();
-  } else {
-    res.writeHead(401, { 'WWW-Authenticate': 'Basic' });
-    res.end(JSON.stringify({ error: 'Invalid credentials' }));
-  }
+  res.writeHead(401);
+  res.end(JSON.stringify({ error: 'Invalid credentials' }));
 };
 
 // API key validation middleware
@@ -193,7 +188,8 @@ const validateApiKey = async (req, res, next) => {
     /^\/admin\/.*/,
     /^\/manifest.json$/,
     /^\/[^/]+\/manifest.json$/,
-    /^\/static\/.*/  // Skip validation for static files
+    /^\/static\/.*/,
+    /^\/options$/  // Also skip validation for options endpoint
   ];
   
   if (skipPaths.some(pattern => pattern.test(req.url))) {
@@ -219,10 +215,14 @@ const validateApiKey = async (req, res, next) => {
   }
 };
 
-// Apply API key validation middleware to all routes
-router.use(validateApiKey);
+// Admin page route - must be before API routes
+router.get(['/admin', '/admin.html'], (req, res) => {
+  const filePath = join(__dirname, 'static', 'admin.html');
+  res.setHeader('content-type', 'text/html');
+  res.end(fs.readFileSync(filePath));
+});
 
-// Admin API key management routes
+// Admin API key management routes - after admin page route
 router.use('/admin/apikeys', bodyParser.json());
 
 // List all API keys
@@ -279,11 +279,8 @@ router.delete('/admin/apikeys/:key', authenticateAdmin, async (req, res) => {
   }
 });
 
-// Admin page route
-router.get('/admin', (req, res) => {
-  res.redirect('static/admin.html');
-  res.end();
-});
+// Apply API key validation middleware to all routes
+router.use(validateApiKey);
 
 export default function (req, res) {
   router(req, res, function () {
