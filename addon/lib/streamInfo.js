@@ -29,7 +29,7 @@ export function toStreamInfo(record) {
       joinDetailParts([
         joinDetailParts([record.torrent.seeders], '👤 '),
         joinDetailParts([formatSize(record.size)], '💾 '),
-        joinDetailParts([provider], '⚙️ ')
+        joinDetailParts([provider], '🌐 ')
       ]),
       joinDetailParts(getLanguages(record, torrentInfo, fileInfo), '', ' / '),
     ],
