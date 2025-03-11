@@ -4,7 +4,9 @@
   "exports": "./index.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "author": "TheBeastLT <pauliox@beyond.lt>",
   "license": "MIT",
