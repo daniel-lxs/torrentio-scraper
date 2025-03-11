@@ -34,10 +34,10 @@ const limiter = rateLimit({
 router.use(cors())
 
 // Serve static files
-router.get('/static/:file', (req, res) => {
-  const filePath = join(__dirname, 'static', req.params.file);
+router.get('/static/*', (req, res) => {
+  const filePath = join(__dirname, 'static', req.url.replace('/static/', ''));
   if (fs.existsSync(filePath)) {
-    const ext = req.params.file.split('.').pop().toLowerCase();
+    const ext = req.url.split('.').pop().toLowerCase();
     const contentTypes = {
       'js': 'application/javascript',
       'css': 'text/css',
@@ -45,7 +45,10 @@ router.get('/static/:file', (req, res) => {
       'png': 'image/png',
       'jpg': 'image/jpeg',
       'jpeg': 'image/jpeg',
-      'gif': 'image/gif'
+      'gif': 'image/gif',
+      'mp4': 'video/mp4',
+      'webm': 'video/webm',
+      'ogg': 'video/ogg'
     };
     res.setHeader('Content-Type', contentTypes[ext] || 'text/plain');
     res.end(fs.readFileSync(filePath));
