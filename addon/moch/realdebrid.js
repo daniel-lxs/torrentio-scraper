@@ -57,8 +57,8 @@ function _getCachedFileIds(fileIndex, cachedResults) {
   }
 
   const cachedIds = Number.isInteger(fileIndex)
-      ? cachedResults.find(ids => Array.isArray(ids) && ids.includes(fileIndex + 1))
-      : cachedResults[0];
+    ? cachedResults.find(ids => Array.isArray(ids) && ids.includes(fileIndex + 1))
+    : cachedResults[0];
   return cachedIds || [];
 }
 
@@ -72,15 +72,15 @@ export async function getCatalog(apiKey, catalogId, config) {
     name: DEBRID_DOWNLOADS
   }] : [];
   const torrentMetas = await _getAllTorrents(RD, page)
-      .then(torrents => Array.isArray(torrents) ? torrents : [])
-      .then(torrents => torrents
-          .filter(torrent => torrent && statusReady(torrent.status))
-          .map(torrent => ({
-            id: `${KEY}:${torrent.id}`,
-            type: Type.OTHER,
-            name: torrent.filename
-          })));
-  return downloadsMeta.concat(torrentMetas)
+    .then(torrents => Array.isArray(torrents) ? torrents : [])
+    .then(torrents => torrents
+      .filter(torrent => torrent && statusReady(torrent.status))
+      .map(torrent => ({
+        id: `${KEY}:${torrent.id}`,
+        type: Type.OTHER,
+        name: torrent.filename
+      })));
+  return downloadsMeta.concat(torrentMetas);
 }
 
 export async function getItemMeta(itemId, apiKey, ip) {
@@ -88,16 +88,16 @@ export async function getItemMeta(itemId, apiKey, ip) {
   const RD = new RealDebridClient(apiKey, options);
   if (itemId === DEBRID_DOWNLOADS) {
     const videos = await _getAllDownloads(RD)
-        .then(downloads => downloads
-            .map(download => ({
-              id: `${KEY}:${DEBRID_DOWNLOADS}:${download.id}`,
-              // infoHash: allTorrents
-              //     .filter(torrent => (torrent.links || []).find(link => link === download.link))
-              //     .map(torrent => torrent.hash.toLowerCase())[0],
-              title: download.filename,
-              released: new Date(download.generated).toISOString(),
-              streams: [{ url: download.download }]
-            })));
+      .then(downloads => downloads
+        .map(download => ({
+          id: `${KEY}:${DEBRID_DOWNLOADS}:${download.id}`,
+          // infoHash: allTorrents
+          //     .filter(torrent => (torrent.links || []).find(link => link === download.link))
+          //     .map(torrent => torrent.hash.toLowerCase())[0],
+          title: download.filename,
+          released: new Date(download.generated).toISOString(),
+          streams: [{ url: download.download }]
+        })));
     return {
       id: `${KEY}:${DEBRID_DOWNLOADS}`,
       type: Type.OTHER,
@@ -106,30 +106,30 @@ export async function getItemMeta(itemId, apiKey, ip) {
     };
   }
   return _getTorrentInfo(RD, itemId)
-      .then(torrent => ({
-        id: `${KEY}:${torrent.id}`,
-        type: Type.OTHER,
-        name: torrent.filename,
-        infoHash: torrent.hash.toLowerCase(),
-        videos: torrent.files
-            .filter(file => file.selected)
-            .filter(file => isVideo(file.path))
-            .map((file, index) => ({
-              id: `${KEY}:${torrent.id}:${file.id}`,
-              title: file.path,
-              released: new Date(new Date(torrent.added).getTime() - index).toISOString(),
-              streams: [{ url: `${apiKey}/${torrent.hash.toLowerCase()}/null/${file.id - 1}` }]
-            }))
-      }))
+    .then(torrent => ({
+      id: `${KEY}:${torrent.id}`,
+      type: Type.OTHER,
+      name: torrent.filename,
+      infoHash: torrent.hash.toLowerCase(),
+      videos: torrent.files
+        .filter(file => file.selected)
+        .filter(file => isVideo(file.path))
+        .map((file, index) => ({
+          id: `${KEY}:${torrent.id}:${file.id}`,
+          title: file.path,
+          released: new Date(new Date(torrent.added).getTime() - index).toISOString(),
+          streams: [{ url: `${apiKey}/${torrent.hash.toLowerCase()}/null/${file.id - 1}` }]
+        }))
+    }));
 }
 
 async function _getAllTorrents(RD, page = 1) {
   return RD.torrents.get(page - 1, page, CATALOG_PAGE_SIZE)
-      .then(torrents => torrents && torrents.length === CATALOG_PAGE_SIZE && page < CATALOG_MAX_PAGE
-          ? _getAllTorrents(RD, page + 1)
-              .then(nextTorrents => torrents.concat(nextTorrents))
-              .catch(() => torrents)
-          : torrents)
+    .then(torrents => torrents && torrents.length === CATALOG_PAGE_SIZE && page < CATALOG_MAX_PAGE
+      ? _getAllTorrents(RD, page + 1)
+        .then(nextTorrents => torrents.concat(nextTorrents))
+        .catch(() => torrents)
+      : torrents);
 }
 
 async function _getAllDownloads(RD, page = 1) {
@@ -142,33 +142,33 @@ export async function resolve({ ip, isBrowser, apiKey, infoHash, fileIndex }) {
   const RD = new RealDebridClient(apiKey, options);
 
   return _resolve(RD, infoHash, fileIndex, isBrowser)
-      .then(async result => {
-        // Mark this torrent as played when it's successfully resolved
-        const marked = await markTorrentAsPlayed(infoHash, fileIndex);
-        if (!marked) {
-          console.warn(`Failed to mark torrent ${infoHash} [${fileIndex}] as played, but continuing with playback`);
-        }
-        return result;
-      })
-      .catch(error => {
-        if (isAccessDeniedError(error)) {
-          console.log(`Access denied to RealDebrid ${infoHash} [${fileIndex}]`);
-          return StaticResponse.FAILED_ACCESS;
-        }
-        if (isInfringingFileError(error)) {
-          console.log(`Infringing file removed from RealDebrid ${infoHash} [${fileIndex}]`);
-          return StaticResponse.FAILED_INFRINGEMENT;
-        }
-        if (isLimitExceededError(error)) {
-          console.log(`Limits exceeded in RealDebrid ${infoHash} [${fileIndex}]`);
-          return StaticResponse.LIMITS_EXCEEDED;
-        }
-        if (isTorrentTooBigError(error)) {
-          console.log(`Torrent too big for RealDebrid ${infoHash} [${fileIndex}]`);
-          return StaticResponse.FAILED_TOO_BIG;
-        }
-        return Promise.reject(`Failed RealDebrid adding torrent ${JSON.stringify(error)}`);
-      });
+    .then(async result => {
+      // Mark this torrent as played when it's successfully resolved
+      const marked = await markTorrentAsPlayed(infoHash, fileIndex);
+      if (!marked) {
+        console.warn(`Failed to mark torrent ${infoHash} [${fileIndex}] as played, but continuing with playback`);
+      }
+      return result;
+    })
+    .catch(error => {
+      if (isAccessDeniedError(error)) {
+        console.log(`Access denied to RealDebrid ${infoHash} [${fileIndex}]`);
+        return StaticResponse.FAILED_ACCESS;
+      }
+      if (isInfringingFileError(error)) {
+        console.log(`Infringing file removed from RealDebrid ${infoHash} [${fileIndex}]`);
+        return StaticResponse.FAILED_INFRINGEMENT;
+      }
+      if (isLimitExceededError(error)) {
+        console.log(`Limits exceeded in RealDebrid ${infoHash} [${fileIndex}]`);
+        return StaticResponse.LIMITS_EXCEEDED;
+      }
+      if (isTorrentTooBigError(error)) {
+        console.log(`Torrent too big for RealDebrid ${infoHash} [${fileIndex}]`);
+        return StaticResponse.FAILED_TOO_BIG;
+      }
+      return Promise.reject(`Failed RealDebrid adding torrent ${JSON.stringify(error)}`);
+    });
 }
 
 async function _resolveCachedFileIds(RD, infoHash, fileIndex) {
@@ -205,28 +205,28 @@ async function _resolve(RD, infoHash, fileIndex, isBrowser) {
   } else if (torrent && (statusWaitingSelection(torrent.status) || statusOpening(torrent.status))) {
     console.log(`Trying to select files on RealDebrid ${infoHash} [${fileIndex}]...`);
     return _selectTorrentFiles(RD, torrent)
-        .then(() => {
-          console.log(`Downloading to RealDebrid ${infoHash} [${fileIndex}]...`);
-          return StaticResponse.DOWNLOADING
-        })
-        .catch(error => {
-          console.log(`Failed RealDebrid opening torrent ${infoHash} [${fileIndex}]:`, error);
-          return StaticResponse.FAILED_OPENING;
-        });
+      .then(() => {
+        console.log(`Downloading to RealDebrid ${infoHash} [${fileIndex}]...`);
+        return StaticResponse.DOWNLOADING;
+      })
+      .catch(error => {
+        console.log(`Failed RealDebrid opening torrent ${infoHash} [${fileIndex}]:`, error);
+        return StaticResponse.FAILED_OPENING;
+      });
   }
   return Promise.reject(`Failed RealDebrid adding torrent ${JSON.stringify(torrent)}`);
 }
 
 async function _createOrFindTorrentId(RD, infoHash, fileIndex) {
   return _findTorrent(RD, infoHash, fileIndex)
-      .catch(() => _createTorrentId(RD, infoHash, fileIndex));
+    .catch(() => _createTorrentId(RD, infoHash, fileIndex));
 }
 
 async function _findTorrent(RD, infoHash, fileIndex) {
   const torrents = await RD.torrents.get(0, 1) || [];
   const foundTorrents = torrents
-      .filter(torrent => torrent.hash.toLowerCase() === infoHash)
-      .filter(torrent => !statusError(torrent.status));
+    .filter(torrent => torrent.hash.toLowerCase() === infoHash)
+    .filter(torrent => !statusError(torrent.status));
   const foundTorrent = await _findBestFitTorrent(RD, foundTorrents, fileIndex);
   return foundTorrent?.id || Promise.reject('No recent torrent found');
 }
@@ -237,14 +237,14 @@ async function _findBestFitTorrent(RD, torrents, fileIndex) {
   }
   const torrentInfos = await Promise.all(torrents.map(torrent => _getTorrentInfo(RD, torrent.id)));
   const bestFitTorrents = torrentInfos
-      .filter(torrent => torrent.files.find(f => f.id === fileIndex + 1 && f.selected))
-      .sort((a, b) => b.links.length - a.links.length);
+    .filter(torrent => torrent.files.find(f => f.id === fileIndex + 1 && f.selected))
+    .sort((a, b) => b.links.length - a.links.length);
   return bestFitTorrents[0] || torrents[0];
 }
 
 async function _getTorrentInfo(RD, torrentId) {
   if (!torrentId || typeof torrentId === 'object') {
-    return torrentId || Promise.reject('No RealDebrid torrentId provided')
+    return torrentId || Promise.reject('No RealDebrid torrentId provided');
   }
   return RD.torrents.info(torrentId);
 }
@@ -272,30 +272,30 @@ async function _retryCreateTorrent(RD, infoHash, fileIndex, shouldRetry = false)
   const newTorrentId = await _recreateTorrentId(RD, infoHash, fileIndex, true);
   const newTorrent = await _getTorrentInfo(RD, newTorrentId);
   return newTorrent && statusReady(newTorrent.status)
-      ? _unrestrictLink(RD, newTorrent, fileIndex, false, shouldRetry)
-      : StaticResponse.FAILED_DOWNLOAD;
+    ? _unrestrictLink(RD, newTorrent, fileIndex, false, shouldRetry)
+    : StaticResponse.FAILED_DOWNLOAD;
 }
 
 async function _selectTorrentFiles(RD, torrent, fileIndex) {
   torrent = statusWaitingSelection(torrent.status) ? torrent : await _openTorrent(RD, torrent.id);
   if (torrent?.files && statusWaitingSelection(torrent.status)) {
     const videoFileIds = Number.isInteger(fileIndex) ? `${fileIndex + 1}` : torrent.files
-        .filter(file => isVideo(file.path))
-        .filter(file => file.bytes > MIN_SIZE)
-        .map(file => file.id)
-        .join(',');
+      .filter(file => isVideo(file.path))
+      .filter(file => file.bytes > MIN_SIZE)
+      .map(file => file.id)
+      .join(',');
     return RD.torrents.selectFiles(torrent.id, videoFileIds);
   } else if (statusReady(torrent.status) || statusDownloading(torrent.status)) {
     return torrent;
   }
-  return Promise.reject('Failed RealDebrid torrent file selection')
+  return Promise.reject('Failed RealDebrid torrent file selection');
 }
 
 async function _openTorrent(RD, torrentId, pollCounter = 0, pollRate = 2000, maxPollNumber = 15) {
   return _getTorrentInfo(RD, torrentId)
-      .then(torrent => torrent && statusOpening(torrent.status) && pollCounter < maxPollNumber
-          ? delay(pollRate).then(() => _openTorrent(RD, torrentId, pollCounter + 1))
-          : torrent);
+    .then(torrent => torrent && statusOpening(torrent.status) && pollCounter < maxPollNumber
+      ? delay(pollRate).then(() => _openTorrent(RD, torrentId, pollCounter + 1))
+      : torrent);
 }
 
 async function _unrestrictLink(RD, torrent, fileIndex, isBrowser, shouldRetry = true) {
@@ -309,12 +309,12 @@ async function _unrestrictLink(RD, torrent, fileIndex, isBrowser, shouldRetry = 
 
   const selectedFiles = torrent.files.filter(file => file.selected);
   const fileLink = torrent.links.length === 1
-      ? torrent.links[0]
-      : torrent.links[selectedFiles.indexOf(targetFile)];
+    ? torrent.links[0]
+    : torrent.links[selectedFiles.indexOf(targetFile)];
 
   if (shouldRetry && !fileLink?.length) {
     console.log(`No RealDebrid links found for ${torrent.hash} [${fileIndex}]`);
-    return _retryCreateTorrent(RD, torrent.hash, fileIndex)
+    return _retryCreateTorrent(RD, torrent.hash, fileIndex);
   }
 
   return _unrestrictFileLink(RD, fileLink, torrent, fileIndex, isBrowser, shouldRetry);
@@ -322,33 +322,33 @@ async function _unrestrictLink(RD, torrent, fileIndex, isBrowser, shouldRetry = 
 
 async function _unrestrictFileLink(RD, fileLink, torrent, fileIndex, isBrowser, shouldRetry) {
   return RD.unrestrict.link(fileLink)
-      .then(response => {
-        if (isArchive(response.download)) {
-          if (shouldRetry && Number.isInteger(fileIndex) && torrent.files.filter(file => file.selected).length > 1) {
-            console.log(`Only archive is available, try to download single file for ${torrent.hash} [${fileIndex}]`);
-            return _retryCreateTorrent(RD, torrent.hash, fileIndex)
-          }
-          return StaticResponse.FAILED_RAR;
+    .then(response => {
+      if (isArchive(response.download)) {
+        if (shouldRetry && Number.isInteger(fileIndex) && torrent.files.filter(file => file.selected).length > 1) {
+          console.log(`Only archive is available, try to download single file for ${torrent.hash} [${fileIndex}]`);
+          return _retryCreateTorrent(RD, torrent.hash, fileIndex);
         }
-        // if (isBrowser && response.streamable) {
-        //   return RD.streaming.transcode(response.id)
-        //       .then(streamResponse => streamResponse.apple.full)
-        // }
-        return response.download;
-      })
-      .then(unrestrictedLink => {
-        console.log(`Unrestricted RealDebrid ${torrent.hash} [${fileIndex}] to ${unrestrictedLink}`);
-        const cachedFileIds = torrent.files.filter(file => file.selected).map(file => file.id);
-        cacheAvailabilityResults(torrent.hash.toLowerCase(), cachedFileIds); // no need to await can happen async
-        return unrestrictedLink;
-      })
-      .catch(error => {
-        if (shouldRetry && error.code === 19) {
-          console.log(`Retry download as hoster is unavailable for ${torrent.hash} [${fileIndex}]`);
-          return _retryCreateTorrent(RD, torrent.hash.toLowerCase(), fileIndex);
-        }
-        return Promise.reject(error);
-      });
+        return StaticResponse.FAILED_RAR;
+      }
+      // if (isBrowser && response.streamable) {
+      //   return RD.streaming.transcode(response.id)
+      //       .then(streamResponse => streamResponse.apple.full)
+      // }
+      return response.download;
+    })
+    .then(unrestrictedLink => {
+      console.log(`Unrestricted RealDebrid ${torrent.hash} [${fileIndex}] to ${unrestrictedLink}`);
+      const cachedFileIds = torrent.files.filter(file => file.selected).map(file => file.id);
+      cacheAvailabilityResults(torrent.hash.toLowerCase(), cachedFileIds); // no need to await can happen async
+      return unrestrictedLink;
+    })
+    .catch(error => {
+      if (shouldRetry && error.code === 19) {
+        console.log(`Retry download as hoster is unavailable for ${torrent.hash} [${fileIndex}]`);
+        return _retryCreateTorrent(RD, torrent.hash.toLowerCase(), fileIndex);
+      }
+      return Promise.reject(error);
+    });
 }
 
 export function toCommonError(error) {

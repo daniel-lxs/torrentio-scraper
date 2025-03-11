@@ -9,13 +9,13 @@ const KEY = 'debridlink';
 
 export async function getCachedStreams(streams, apiKey) {
   return streams
-      .reduce((mochStreams, stream) => {
-        mochStreams[`${stream.infoHash}@${stream.fileIdx}`] = {
-          url: `${apiKey}/${stream.infoHash}/null/${stream.fileIdx}`,
-          cached: false
-        };
-        return mochStreams;
-      }, {})
+    .reduce((mochStreams, stream) => {
+      mochStreams[`${stream.infoHash}@${stream.fileIdx}`] = {
+        url: `${apiKey}/${stream.infoHash}/null/${stream.fileIdx}`,
+        cached: false
+      };
+      return mochStreams;
+    }, {});
 }
 
 export async function getCatalog(apiKey, catalogId, config) {
@@ -25,35 +25,35 @@ export async function getCatalog(apiKey, catalogId, config) {
   const options = await getDefaultOptions();
   const DL = new DebridLinkClient(apiKey, options);
   return DL.seedbox.list()
-      .then(response => response.value)
-      .then(torrents => (torrents || [])
-          .filter(torrent => torrent && statusReady(torrent))
-          .map(torrent => ({
-            id: `${KEY}:${torrent.id}`,
-            type: Type.OTHER,
-            name: torrent.name
-          })));
+    .then(response => response.value)
+    .then(torrents => (torrents || [])
+      .filter(torrent => torrent && statusReady(torrent))
+      .map(torrent => ({
+        id: `${KEY}:${torrent.id}`,
+        type: Type.OTHER,
+        name: torrent.name
+      })));
 }
 
 export async function getItemMeta(itemId, apiKey, ip) {
   const options = await getDefaultOptions(ip);
   const DL = new DebridLinkClient(apiKey, options);
   return DL.seedbox.list(itemId)
-      .then(response => response.value[0])
-      .then(torrent => ({
-        id: `${KEY}:${torrent.id}`,
-        type: Type.OTHER,
-        name: torrent.name,
-        infoHash: torrent.hashString.toLowerCase(),
-        videos: torrent.files
-            .filter(file => isVideo(file.name))
-            .map((file, index) => ({
-              id: `${KEY}:${torrent.id}:${index}`,
-              title: file.name,
-              released: new Date(torrent.created * 1000 - index).toISOString(),
-              streams: [{ url: file.downloadUrl }]
-            }))
-      }))
+    .then(response => response.value[0])
+    .then(torrent => ({
+      id: `${KEY}:${torrent.id}`,
+      type: Type.OTHER,
+      name: torrent.name,
+      infoHash: torrent.hashString.toLowerCase(),
+      videos: torrent.files
+        .filter(file => isVideo(file.name))
+        .map((file, index) => ({
+          id: `${KEY}:${torrent.id}:${index}`,
+          title: file.name,
+          released: new Date(torrent.created * 1000 - index).toISOString(),
+          streams: [{ url: file.downloadUrl }]
+        }))
+    }));
 }
 
 export async function resolve({ ip, apiKey, infoHash, fileIndex }) {
@@ -62,21 +62,21 @@ export async function resolve({ ip, apiKey, infoHash, fileIndex }) {
   const DL = new DebridLinkClient(apiKey, options);
 
   return _resolve(DL, infoHash, fileIndex)
-      .catch(error => {
-        if (isAccessDeniedError(error)) {
-          console.log(`Access denied to DebridLink ${infoHash} [${fileIndex}]`);
-          return StaticResponse.FAILED_ACCESS;
-        }
-        if (isLimitsExceededError(error)) {
-          console.log(`Limits exceeded in DebridLink ${infoHash} [${fileIndex}]`);
-          return StaticResponse.LIMITS_EXCEEDED;
-        }
-        if (isTorrentTooBigError(error)) {
-          console.log(`Torrent too big for DebridLink ${infoHash} [${fileIndex}]`);
-          return StaticResponse.FAILED_TOO_BIG;
-        }
-        return Promise.reject(`Failed DebridLink adding torrent ${JSON.stringify(error)}`);
-      });
+    .catch(error => {
+      if (isAccessDeniedError(error)) {
+        console.log(`Access denied to DebridLink ${infoHash} [${fileIndex}]`);
+        return StaticResponse.FAILED_ACCESS;
+      }
+      if (isLimitsExceededError(error)) {
+        console.log(`Limits exceeded in DebridLink ${infoHash} [${fileIndex}]`);
+        return StaticResponse.LIMITS_EXCEEDED;
+      }
+      if (isTorrentTooBigError(error)) {
+        console.log(`Torrent too big for DebridLink ${infoHash} [${fileIndex}]`);
+        return StaticResponse.FAILED_TOO_BIG;
+      }
+      return Promise.reject(`Failed DebridLink adding torrent ${JSON.stringify(error)}`);
+    });
 }
 
 async function _resolve(DL, infoHash, fileIndex) {
@@ -93,7 +93,7 @@ async function _resolve(DL, infoHash, fileIndex) {
 
 async function _createOrFindTorrent(DL, infoHash) {
   return _findTorrent(DL, infoHash)
-      .catch(() => _createTorrent(DL, infoHash));
+    .catch(() => _createTorrent(DL, infoHash));
 }
 
 async function _findTorrent(DL, infoHash) {
@@ -110,11 +110,11 @@ async function _createTorrent(DL, infoHash) {
 
 async function _unrestrictLink(DL, torrent, fileIndex) {
   const targetFile = Number.isInteger(fileIndex)
-      ? torrent.files[fileIndex]
-      : torrent.files.filter(file => file.downloadPercent === 100).sort((a, b) => b.size - a.size)[0];
+    ? torrent.files[fileIndex]
+    : torrent.files.filter(file => file.downloadPercent === 100).sort((a, b) => b.size - a.size)[0];
 
   if (!targetFile && torrent.files.every(file => isArchive(file.downloadUrl))) {
-    console.log(`Only DebridLink archive is available for [${torrent.hashString}] ${fileIndex}`)
+    console.log(`Only DebridLink archive is available for [${torrent.hashString}] ${fileIndex}`);
     return StaticResponse.FAILED_RAR;
   }
   if (!targetFile || !targetFile.downloadUrl) {
@@ -136,7 +136,7 @@ export function toCommonError(error) {
 }
 
 function statusDownloading(torrent) {
-  return torrent.downloadPercent < 100
+  return torrent.downloadPercent < 100;
 }
 
 function statusReady(torrent) {

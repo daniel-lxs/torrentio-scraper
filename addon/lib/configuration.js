@@ -17,16 +17,16 @@ export function parseConfiguration(configuration) {
   }
 
   const configValues = configuration.split('|')
-      .reduce((map, next) => {
-        const parameterParts = next.split('=');
-        if (parameterParts.length === 2) {
-          map[parameterParts[0].toLowerCase()] = parameterParts[1];
-        }
-        return map;
-      }, {});
+    .reduce((map, next) => {
+      const parameterParts = next.split('=');
+      if (parameterParts.length === 2) {
+        map[parameterParts[0].toLowerCase()] = parameterParts[1];
+      }
+      return map;
+    }, {});
   keysToSplit
-      .filter(key => configValues[key])
-      .forEach(key => configValues[key] = configValues[key].split(',')
-          .map(value => keysToUppercase.includes(key) ? value.toUpperCase() : value.toLowerCase()))
+    .filter(key => configValues[key])
+    .forEach(key => configValues[key] = configValues[key].split(',')
+      .map(value => keysToUppercase.includes(key) ? value.toUpperCase() : value.toLowerCase()));
   return configValues;
 }

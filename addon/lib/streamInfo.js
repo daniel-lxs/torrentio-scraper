@@ -23,29 +23,29 @@ export function toStreamInfo(record) {
   const provider = record.prowlarrIndexer || record.torrent.provider;
   
   const title = joinDetailParts(
-      [
-        joinDetailParts([record.torrent.title.replace(/[, ]+/g, ' ')]),
-        joinDetailParts([!sameInfo && record.title || undefined]),
-        joinDetailParts([
-          joinDetailParts([record.torrent.seeders], '👤 '),
-          joinDetailParts([formatSize(record.size)], '💾 '),
-          joinDetailParts([provider], '⚙️ ')
-        ]),
-        joinDetailParts(getLanguages(record, torrentInfo, fileInfo), '', ' / '),
-      ],
-      '',
-      '\n'
+    [
+      joinDetailParts([record.torrent.title.replace(/[, ]+/g, ' ')]),
+      joinDetailParts([!sameInfo && record.title || undefined]),
+      joinDetailParts([
+        joinDetailParts([record.torrent.seeders], '👤 '),
+        joinDetailParts([formatSize(record.size)], '💾 '),
+        joinDetailParts([provider], '⚙️ ')
+      ]),
+      joinDetailParts(getLanguages(record, torrentInfo, fileInfo), '', ' / '),
+    ],
+    '',
+    '\n'
   );
   const name = joinDetailParts(
-      [
-        joinDetailParts([ADDON_NAME]),
-        joinDetailParts([quality, three3Quality, joinDetailParts(hdrProfiles, '', ' | ')])
-      ],
-      '',
-      '\n'
+    [
+      joinDetailParts([ADDON_NAME]),
+      joinDetailParts([quality, three3Quality, joinDetailParts(hdrProfiles, '', ' | ')])
+    ],
+    '',
+    '\n'
   );
   const bingeGroupParts = getBingeGroupParts(record, sameInfo, quality, torrentInfo, fileInfo);
-  const bingeGroup = joinDetailParts(bingeGroupParts, "torrentio|", "|")
+  const bingeGroup = joinDetailParts(bingeGroupParts, 'torrentio|', '|');
   const filename = Number.isInteger(record.fileIndex) ? record.title.split('/').pop() : undefined;
   const behaviorHints = bingeGroup || filename ? cleanOutputObject({ bingeGroup, filename }) : undefined;
 
@@ -81,7 +81,7 @@ function getLanguages(record, torrentInfo, fileInfo) {
   if (record.kitsuId || record.torrent.type === Type.ANIME) {
     // no need to display japanese for anime
     languages = languages.concat(dubbed ? ['dubbed'] : [])
-        .filter(lang => lang !== 'japanese');
+      .filter(lang => lang !== 'japanese');
   }
   if (languages.length === 1 && languages.includes('english')) {
     // no need to display languages if only english is present
@@ -137,16 +137,16 @@ function enrichSubtitles(stream) {
 
 function getBingeGroupParts(record, sameInfo, quality, torrentInfo, fileInfo) {
   if (record.torrent.type === Type.MOVIE) {
-    const source = torrentInfo.source || fileInfo.source
+    const source = torrentInfo.source || fileInfo.source;
     return [quality]
-        .concat(source !== quality ? source : [])
-        .concat(torrentInfo.codec || fileInfo.codec)
-        .concat(torrentInfo.bitDepth || fileInfo.bitDepth)
-        .concat(torrentInfo.hdr || fileInfo.hdr);
+      .concat(source !== quality ? source : [])
+      .concat(torrentInfo.codec || fileInfo.codec)
+      .concat(torrentInfo.bitDepth || fileInfo.bitDepth)
+      .concat(torrentInfo.hdr || fileInfo.hdr);
   } else if (sameInfo) {
     return [quality]
-        .concat(fileInfo.hdr)
-        .concat(fileInfo.group);
+      .concat(fileInfo.hdr)
+      .concat(fileInfo.group);
   }
   return [record.infoHash];
 }

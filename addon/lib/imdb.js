@@ -30,8 +30,8 @@ export async function fetchImdbSuggests(imdbId) {
               name: exactMatch.l,
               year: exactMatch.y,
               type: exactMatch.qid === 'movie' ? 'movie' : 
-                    exactMatch.qid === 'tvSeries' ? 'series' : 
-                    exactMatch.qid === 'tvEpisode' ? 'episode' : 'unknown'
+                exactMatch.qid === 'tvSeries' ? 'series' : 
+                  exactMatch.qid === 'tvEpisode' ? 'episode' : 'unknown'
             }
           };
         }

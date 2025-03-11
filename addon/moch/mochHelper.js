@@ -1,26 +1,26 @@
 import * as repository  from '../lib/repository.js';
 
-const METAHUB_URL = 'https://images.metahub.space'
-export const BadTokenError = { code: 'BAD_TOKEN' }
-export const AccessDeniedError = { code: 'ACCESS_DENIED' }
-export const AccessBlockedError = { code: 'ACCESS_BLOCKED' }
+const METAHUB_URL = 'https://images.metahub.space';
+export const BadTokenError = { code: 'BAD_TOKEN' };
+export const AccessDeniedError = { code: 'ACCESS_DENIED' };
+export const AccessBlockedError = { code: 'ACCESS_BLOCKED' };
 
 export function chunkArray(arr, size) {
   return arr.length > size
-      ? [arr.slice(0, size), ...chunkArray(arr.slice(size), size)]
-      : [arr];
+    ? [arr.slice(0, size), ...chunkArray(arr.slice(size), size)]
+    : [arr];
 }
 
 export function streamFilename(stream) {
   const filename = stream?.behaviorHints?.filename
       || stream.title.replace(/\n👤.*/s, '').split('\n').pop().split('/').pop();
-  return encodeURIComponent(filename)
+  return encodeURIComponent(filename);
 }
 
 export async function enrichMeta(itemMeta) {
   const infoHashes = [...new Set([itemMeta.infoHash]
-      .concat(itemMeta.videos.map(video => video.infoHash))
-      .filter(infoHash => infoHash))];
+    .concat(itemMeta.videos.map(video => video.infoHash))
+    .filter(infoHash => infoHash))];
   const files = infoHashes.length ? await repository.getFiles(infoHashes).catch(() => []) : [];
   const commonImdbId = itemMeta.infoHash && mostCommonValue(files.map(file => file.imdbId));
   if (files.length) {
@@ -36,7 +36,7 @@ export async function enrichMeta(itemMeta) {
             video.id = `${file.imdbId}:${file.imdbSeason}:${file.imdbEpisode}`;
             video.season = file.imdbSeason;
             video.episode = file.imdbEpisode;
-            video.thumbnail = `https://episodes.metahub.space/${file.imdbId}/${video.season}/${video.episode}/w780.jpg`
+            video.thumbnail = `https://episodes.metahub.space/${file.imdbId}/${video.season}/${video.episode}/w780.jpg`;
           } else {
             video.id = file.imdbId;
             video.thumbnail = `${METAHUB_URL}/background/small/${file.imdbId}/img`;
@@ -44,9 +44,9 @@ export async function enrichMeta(itemMeta) {
         }
         return video;
       })
-    }
+    };
   }
-  return itemMeta
+  return itemMeta;
 }
 
 export function sameFilename(filename, expectedFilename) {

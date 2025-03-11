@@ -19,9 +19,9 @@ export function parseSize(sizeText) {
   }
   let scale = 1;
   if (sizeText.includes('TB')) {
-    scale = 1024 * 1024 * 1024 * 1024
+    scale = 1024 * 1024 * 1024 * 1024;
   } else if (sizeText.includes('GB')) {
-    scale = 1024 * 1024 * 1024
+    scale = 1024 * 1024 * 1024;
   } else if (sizeText.includes('MB')) {
     scale = 1024 * 1024;
   } else if (sizeText.includes('kB')) {

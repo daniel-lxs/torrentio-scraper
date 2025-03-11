@@ -237,7 +237,7 @@ export const QualityFilter = {
       label: '1080p',
       items: ['1080p'],
       test(quality) {
-        return this.items.includes(quality)
+        return this.items.includes(quality);
       }
     },
     {
@@ -245,7 +245,7 @@ export const QualityFilter = {
       label: '720p',
       items: ['720p'],
       test(quality) {
-        return this.items.includes(quality)
+        return this.items.includes(quality);
       }
     },
     {
@@ -253,7 +253,7 @@ export const QualityFilter = {
       label: '480p',
       items: ['480p'],
       test(quality) {
-        return this.items.includes(quality)
+        return this.items.includes(quality);
       }
     },
     {
@@ -270,7 +270,7 @@ export const QualityFilter = {
       label: 'Screener',
       items: ['SCR'],
       test(quality) {
-        return this.items.includes(quality)
+        return this.items.includes(quality);
       }
     },
     {
@@ -278,14 +278,14 @@ export const QualityFilter = {
       label: 'Cam',
       items: ['CAM', 'TeleSync', 'TeleCine'],
       test(quality) {
-        return this.items.includes(quality)
+        return this.items.includes(quality);
       }
     },
     {
       key: 'unknown',
       label: 'Unknown',
       test(quality) {
-        return !quality
+        return !quality;
       }
     }
   ]
@@ -293,7 +293,7 @@ export const QualityFilter = {
 
 export const SizeFilter = {
   key: 'sizefilter'
-}
+};
 
 
 export default function applyFilters(streams, config) {

@@ -1,3 +1,5 @@
+import { setTimeout } from 'timers/promises';
+
 /**
  * Delay promise
  */

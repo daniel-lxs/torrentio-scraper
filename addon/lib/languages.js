@@ -46,7 +46,7 @@ const languageMapping = {
   'indonesian': '🇮🇩',
   'malay': '🇲🇾',
   'thai': '🇹🇭'
-}
+};
 
 export const LanguageOptions = {
   key: 'language',
@@ -54,16 +54,16 @@ export const LanguageOptions = {
     key: lang,
     label: `${languageMapping[lang]} ${lang.charAt(0).toUpperCase()}${lang.slice(1)}`
   }))
-}
+};
 
 export function mapLanguages(languages) {
   const mapped = languages
-      .map(language => languageMapping[language])
-      .filter(language => language)
-      .sort((a, b) => Object.values(languageMapping).indexOf(a) - Object.values(languageMapping).indexOf(b));
+    .map(language => languageMapping[language])
+    .filter(language => language)
+    .sort((a, b) => Object.values(languageMapping).indexOf(a) - Object.values(languageMapping).indexOf(b));
   const unmapped = languages
-      .filter(language => !languageMapping[language])
-      .sort((a, b) => a.localeCompare(b))
+    .filter(language => !languageMapping[language])
+    .sort((a, b) => a.localeCompare(b));
   return [...new Set([].concat(mapped).concat(unmapped))];
 }
 

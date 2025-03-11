@@ -45,7 +45,7 @@ const languageMapping = {
   'vietnamese': 'vie',
   'indonesian': 'ind',
   'thai': 'tha'
-}
+};
 
 const ignoreSet = new Set(['dubbed', 'multi audio', 'multi subs', 'dual audio']);
 const allowedExtensions = ['srt', 'vtt', 'ass', 'ssa'];
@@ -55,14 +55,14 @@ export function getSubtitles(record) {
     return null;
   }
   return record.subtitles
-      .filter(subtitle => isExtension(subtitle.title, allowedExtensions))
-      .sort((a, b) => b.size - a.size)
-      .map(subtitle => ({
-        infoHash: subtitle.infoHash,
-        fileIndex: subtitle.fileIndex,
-        title: subtitle.title,
-        lang: parseLanguage(subtitle.title, record),
-      }));
+    .filter(subtitle => isExtension(subtitle.title, allowedExtensions))
+    .sort((a, b) => b.size - a.size)
+    .map(subtitle => ({
+      infoHash: subtitle.infoHash,
+      fileIndex: subtitle.fileIndex,
+      title: subtitle.title,
+      lang: parseLanguage(subtitle.title, record),
+    }));
 }
 
 function parseLanguage(title, record) {
@@ -82,7 +82,7 @@ function parseLanguage(title, record) {
   const folderName = subtitlePathParts.join('/');
   const folderNameLanguage = getSingleLanguage(folderName.replace(videoFileName, ''));
   if (folderNameLanguage) {
-    return folderNameLanguage
+    return folderNameLanguage;
   }
   return getFileNameLanguageCode(subtitleFileName) || 'Unknown';
 }

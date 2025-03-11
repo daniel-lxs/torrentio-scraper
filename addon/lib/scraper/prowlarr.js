@@ -114,7 +114,7 @@ async function getMagnetUrls(results) {
         const location = response.headers.location || response.headers.Location;
         
         if (location && location.startsWith('magnet:')) {
-          console.log(`Successfully obtained magnet link from redirect header`);
+          console.log('Successfully obtained magnet link from redirect header');
           return { result, magnetUrl: location };
         } else {
           console.log(`No magnet link in Location header: ${JSON.stringify(response.headers)}`);
@@ -128,7 +128,7 @@ async function getMagnetUrls(results) {
       if (error.response && error.response.headers) {
         const location = error.response.headers.location || error.response.headers.Location;
         if (location && location.startsWith('magnet:')) {
-          console.log(`Successfully obtained magnet link from error response redirect header`);
+          console.log('Successfully obtained magnet link from error response redirect header');
           return { result, magnetUrl: location };
         }
       }
@@ -168,7 +168,7 @@ async function processSingleResult(result, magnetUrl, type, imdbId, kitsuId, sea
     if (torrentId && (torrentId.startsWith('magnet:') || torrentId.length > 500)) {
       // If guid is a magnet URL or too long, use the infoHash as the torrentId
       torrentId = infoHash;
-      console.log(`Using infoHash as torrentId because original guid is too long or is a magnet URL`);
+      console.log('Using infoHash as torrentId because original guid is too long or is a magnet URL');
     }
     
     // Create torrent record

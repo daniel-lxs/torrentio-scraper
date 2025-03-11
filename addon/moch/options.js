@@ -10,7 +10,7 @@ export const DebridOptions = {
       description: 'Don\'t show debrid catalog'
     },
   }
-}
+};
 
 export function excludeDownloadLinks(config) {
   return config[DebridOptions.key]?.includes(DebridOptions.options.noDownloadLinks.key);

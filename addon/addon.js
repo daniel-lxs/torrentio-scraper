@@ -8,8 +8,8 @@ import applySorting from './lib/sort.js';
 import applyFilters from './lib/filter.js';
 import { applyMochs, getMochCatalog, getMochItemMeta } from './moch/moch.js';
 import StaticLinks from './moch/static.js';
-import { createNamedQueue } from "./lib/namedQueue.js";
-import pLimit from "p-limit";
+import { createNamedQueue } from './lib/namedQueue.js';
+import pLimit from 'p-limit';
 import { searchContent } from './lib/scraper/prowlarr.js';
 import axios from 'axios';
 import { setTimeout } from 'timers/promises';
@@ -24,7 +24,7 @@ const OMDB_API_KEY = process.env.OMDB_API_KEY || ''; // Add OMDB API key to envi
 
 const builder = new addonBuilder(dummyManifest());
 const requestQueue = createNamedQueue(Infinity);
-const newLimiter = pLimit(30)
+const newLimiter = pLimit(30);
 
 // Function to get title from OMDB API
 async function getTitleFromOMDB(imdbId) {
@@ -74,60 +74,60 @@ builder.defineStreamHandler((args) => {
 
   console.log(`[DEBUG] Stream request received for ${args.id}`);
   return requestQueue.wrap(args.id, () => resolveStreams(args))
-      .then(streams => {
-        console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} before filtering`);
-        return applyFilters(streams, args.extra);
-      })
-      .then(streams => {
-        console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after filtering`);
-        return applySorting(streams, args.extra, args.type);
-      })
-      .then(streams => {
-        console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after sorting`);
-        return applyStaticInfo(streams);
-      })
-      .then(streams => {
-        console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after static info`);
-        return applyMochs(streams, args.extra);
-      })
-      .then(streams => {
-        console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after mochs`);
-        const result = enrichCacheParams(streams);
-        console.log(`[DEBUG] Returning ${result.streams.length} streams to Stremio for ${args.id}`);
-        return result;
-      })
-      .catch(error => {
-        console.error(`[ERROR] Failed request ${args.id}: ${error}`);
-        return Promise.reject(`Failed request ${args.id}: ${error}`);
-      });
+    .then(streams => {
+      console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} before filtering`);
+      return applyFilters(streams, args.extra);
+    })
+    .then(streams => {
+      console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after filtering`);
+      return applySorting(streams, args.extra, args.type);
+    })
+    .then(streams => {
+      console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after sorting`);
+      return applyStaticInfo(streams);
+    })
+    .then(streams => {
+      console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after static info`);
+      return applyMochs(streams, args.extra);
+    })
+    .then(streams => {
+      console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after mochs`);
+      const result = enrichCacheParams(streams);
+      console.log(`[DEBUG] Returning ${result.streams.length} streams to Stremio for ${args.id}`);
+      return result;
+    })
+    .catch(error => {
+      console.error(`[ERROR] Failed request ${args.id}: ${error}`);
+      return Promise.reject(`Failed request ${args.id}: ${error}`);
+    });
 });
 
 builder.defineCatalogHandler((args) => {
   // eslint-disable-next-line no-unused-vars
   const [_, mochKey, catalogId] = args.id.split('-');
-  console.log(`Incoming catalog ${args.id} request with skip=${args.extra.skip || 0}`)
+  console.log(`Incoming catalog ${args.id} request with skip=${args.extra.skip || 0}`);
   return getMochCatalog(mochKey, catalogId, args.extra)
-      .then(metas => ({
-        metas: metas,
-        cacheMaxAge: CATALOG_CACHE_MAX_AGE
-      }))
-      .catch(error => {
-        return Promise.reject(`Failed retrieving catalog ${args.id}: ${JSON.stringify(error.message || error)}`);
-      });
-})
+    .then(metas => ({
+      metas: metas,
+      cacheMaxAge: CATALOG_CACHE_MAX_AGE
+    }))
+    .catch(error => {
+      return Promise.reject(`Failed retrieving catalog ${args.id}: ${JSON.stringify(error.message || error)}`);
+    });
+});
 
 builder.defineMetaHandler((args) => {
   const [mochKey, metaId] = args.id.split(':');
-  console.log(`Incoming debrid meta ${args.id} request`)
+  console.log(`Incoming debrid meta ${args.id} request`);
   return getMochItemMeta(mochKey, metaId, args.extra)
-      .then(meta => ({
-        meta: meta,
-        cacheMaxAge: metaId === 'Downloads' ? 0 : CACHE_MAX_AGE
-      }))
-      .catch(error => {
-        return Promise.reject(`Failed retrieving catalog meta ${args.id}: ${JSON.stringify(error)}`);
-      });
-})
+    .then(meta => ({
+      meta: meta,
+      cacheMaxAge: metaId === 'Downloads' ? 0 : CACHE_MAX_AGE
+    }))
+    .catch(error => {
+      return Promise.reject(`Failed retrieving catalog meta ${args.id}: ${JSON.stringify(error)}`);
+    });
+});
 
 async function resolveStreams(args) {
   // Set a timeout for waiting for results
@@ -135,9 +135,9 @@ async function resolveStreams(args) {
   
   // Create a promise that resolves after the search completes or times out
   const searchPromise = cacheWrapStream(args.id, () => newLimiter(() => streamHandler(args)
-      .then(records => records
-          .sort((a, b) => b.torrent.seeders - a.torrent.seeders || b.torrent.uploadDate - a.torrent.uploadDate)
-          .map(record => toStreamInfo(record)))));
+    .then(records => records
+      .sort((a, b) => b.torrent.seeders - a.torrent.seeders || b.torrent.uploadDate - a.torrent.uploadDate)
+      .map(record => toStreamInfo(record)))));
   
   // First check if we have cached results
   const results = await searchPromise;
@@ -170,8 +170,8 @@ async function resolveStreams(args) {
     // We need to create a new promise here since we already awaited searchPromise
     newLimiter(() => streamHandler(args)
       .then(records => records
-          .sort((a, b) => b.torrent.seeders - a.torrent.seeders || b.torrent.uploadDate - a.torrent.uploadDate)
-          .map(record => toStreamInfo(record)))),
+        .sort((a, b) => b.torrent.seeders - a.torrent.seeders || b.torrent.uploadDate - a.torrent.uploadDate)
+        .map(record => toStreamInfo(record)))),
     timeoutPromise
   ]);
 }
@@ -266,8 +266,8 @@ async function seriesRecordsHandler(args) {
     }
     
     return episode !== undefined
-        ? repository.getKitsuIdSeriesEntries(kitsuId, episode)
-        : repository.getKitsuIdMovieEntries(kitsuId);
+      ? repository.getKitsuIdSeriesEntries(kitsuId, episode)
+      : repository.getKitsuIdMovieEntries(kitsuId);
   }
   return Promise.resolve([]);
 }
@@ -353,7 +353,7 @@ function enrichCacheParams(streams) {
     cacheMaxAge: cacheAge,
     staleRevalidate: STALE_REVALIDATE_AGE,
     staleError: STALE_ERROR_AGE
-  }
+  };
 }
 
 export default builder.getInterface();

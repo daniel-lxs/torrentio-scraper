@@ -7,44 +7,44 @@ import { chunkArray, BadTokenError, sameFilename, streamFilename } from './mochH
 
 const KEY = 'torbox';
 const timeout = 30000;
-const baseUrl = 'https://api.torbox.app/v1'
+const baseUrl = 'https://api.torbox.app/v1';
 
 export async function getCachedStreams(streams, apiKey, ip) {
   const hashBatches = chunkArray(streams.map(stream => stream.infoHash), 150)
-      .map(hashes => getAvailabilityResponse(apiKey, hashes));
+    .map(hashes => getAvailabilityResponse(apiKey, hashes));
   const available = await Promise.all(hashBatches)
-      .then(results => results
-          .map(data => data.map(entry => entry.hash))
-          .reduce((all, result) => all.concat(result), []))
-      .catch(error => {
-        if (toCommonError(error)) {
-          return Promise.reject(error);
-        }
-        const message = error.message || error;
-        console.warn('Failed TorBox cached torrent availability request:', message);
-        return undefined;
-      });
+    .then(results => results
+      .map(data => data.map(entry => entry.hash))
+      .reduce((all, result) => all.concat(result), []))
+    .catch(error => {
+      if (toCommonError(error)) {
+        return Promise.reject(error);
+      }
+      const message = error.message || error;
+      console.warn('Failed TorBox cached torrent availability request:', message);
+      return undefined;
+    });
   return available && streams
-      .reduce((mochStreams, stream) => {
-        const isCached = available.includes(stream.infoHash);
-        const fileName = streamFilename(stream);
-        mochStreams[`${stream.infoHash}@${stream.fileIdx}`] = {
-          url: `${apiKey}/${stream.infoHash}/${fileName}/${stream.fileIdx}`,
-          cached: isCached
-        };
-        return mochStreams;
-      }, {})
+    .reduce((mochStreams, stream) => {
+      const isCached = available.includes(stream.infoHash);
+      const fileName = streamFilename(stream);
+      mochStreams[`${stream.infoHash}@${stream.fileIdx}`] = {
+        url: `${apiKey}/${stream.infoHash}/${fileName}/${stream.fileIdx}`,
+        cached: isCached
+      };
+      return mochStreams;
+    }, {});
 }
 
 export async function getCatalog(apiKey, type, config) {
   return getItemList(apiKey, type, null, config.skip)
-      .then(items => (items || [])
-          .filter(item => statusReady(item))
-          .map(item => ({
-            id: `${KEY}:${type}-${item.id}`,
-            type: Type.OTHER,
-            name: item.name
-          })));
+    .then(items => (items || [])
+      .filter(item => statusReady(item))
+      .map(item => ({
+        id: `${KEY}:${type}-${item.id}`,
+        type: Type.OTHER,
+        name: item.name
+      })));
 }
 
 export async function getItemMeta(itemId, apiKey) {
@@ -57,34 +57,34 @@ export async function getItemMeta(itemId, apiKey) {
     name: item.name,
     infoHash: item.hash,
     videos: item.files
-        .filter(file => isVideo(file.short_name))
-        .map((file, index) => ({
-          id: `${KEY}:${itemId}:${file.id}`,
-          title: file.name,
-          released: new Date(createDate.getTime() - index).toISOString(),
-          streams: [{ url: `${apiKey}/${itemId}-${file.id}/null/null` }]
-        }))
-  }
+      .filter(file => isVideo(file.short_name))
+      .map((file, index) => ({
+        id: `${KEY}:${itemId}:${file.id}`,
+        title: file.name,
+        released: new Date(createDate.getTime() - index).toISOString(),
+        streams: [{ url: `${apiKey}/${itemId}-${file.id}/null/null` }]
+      }))
+  };
 }
 
 export async function resolve({ ip, apiKey, infoHash, cachedEntryInfo, fileIndex }) {
   console.log(`Unrestricting TorBox ${infoHash} [${fileIndex}]`);
   return _resolve(apiKey, infoHash, cachedEntryInfo, fileIndex, ip)
-      .catch(error => {
-        if (isAccessDeniedError(error)) {
-          console.log(`Access denied to TorBox ${infoHash} [${fileIndex}]`);
-          return StaticResponse.FAILED_ACCESS;
-        }
-        if (isLimitExceededError(error)) {
-          console.log(`Limits exceeded to TorBox ${infoHash} [${fileIndex}]`);
-          return StaticResponse.LIMITS_EXCEEDED;
-        }
-        if (isTorrentTooBigError(error)) {
-          console.log(`Torrent too big for TorBox ${infoHash} [${fileIndex}]`);
-          return StaticResponse.FAILED_TOO_BIG;
-        }
-        return Promise.reject(`Failed TorBox adding torrent: ${JSON.stringify(error.message || error)}`);
-      });
+    .catch(error => {
+      if (isAccessDeniedError(error)) {
+        console.log(`Access denied to TorBox ${infoHash} [${fileIndex}]`);
+        return StaticResponse.FAILED_ACCESS;
+      }
+      if (isLimitExceededError(error)) {
+        console.log(`Limits exceeded to TorBox ${infoHash} [${fileIndex}]`);
+        return StaticResponse.LIMITS_EXCEEDED;
+      }
+      if (isTorrentTooBigError(error)) {
+        console.log(`Torrent too big for TorBox ${infoHash} [${fileIndex}]`);
+        return StaticResponse.FAILED_TOO_BIG;
+      }
+      return Promise.reject(`Failed TorBox adding torrent: ${JSON.stringify(error.message || error)}`);
+    });
 }
 
 async function _resolve(apiKey, infoHash, cachedEntryInfo, fileIndex, ip) {
@@ -101,7 +101,7 @@ async function _resolve(apiKey, infoHash, cachedEntryInfo, fileIndex, ip) {
   } else if (torrent && statusError(torrent)) {
     console.log(`Retry failed download in TorBox ${infoHash} [${fileIndex}]...`);
     return controlTorrent(apiKey, torrent.id, 'delete')
-        .then(() => _retryCreateTorrent(apiKey, infoHash, cachedEntryInfo, fileIndex));
+      .then(() => _retryCreateTorrent(apiKey, infoHash, cachedEntryInfo, fileIndex));
   }
 
   return Promise.reject(`Failed TorBox adding torrent ${JSON.stringify(torrent)}`);
@@ -109,7 +109,7 @@ async function _resolve(apiKey, infoHash, cachedEntryInfo, fileIndex, ip) {
 
 async function _createOrFindTorrent(apiKey, infoHash) {
   return _findTorrent(apiKey, infoHash)
-      .catch(() => _createTorrent(apiKey, infoHash));
+    .catch(() => _createTorrent(apiKey, infoHash));
 }
 
 async function _findTorrent(apiKey, infoHash) {
@@ -123,38 +123,38 @@ async function _findTorrent(apiKey, infoHash) {
 async function _createTorrent(apiKey, infoHash, attempts = 1) {
   const magnetLink = await getMagnetLink(infoHash);
   return createTorrent(apiKey, magnetLink)
-      .then(data => {
-        if (data.torrent_id) {
-          return getTorrentList(apiKey, data.torrent_id);
-        }
-        if (data.queued_id) {
-          return Promise.resolve({ ...data, download_state: 'metaDL' })
-        }
-        if (data?.error === 'ACTIVE_LIMIT' && attempts > 0) {
-          return freeLastActiveTorrent(apiKey)
-              .then(() => _createTorrent(apiKey, infoHash, attempts - 1));
-        }
-        return Promise.reject(`Unexpected create data: ${JSON.stringify(data)}`);
-      });
+    .then(data => {
+      if (data.torrent_id) {
+        return getTorrentList(apiKey, data.torrent_id);
+      }
+      if (data.queued_id) {
+        return Promise.resolve({ ...data, download_state: 'metaDL' });
+      }
+      if (data?.error === 'ACTIVE_LIMIT' && attempts > 0) {
+        return freeLastActiveTorrent(apiKey)
+          .then(() => _createTorrent(apiKey, infoHash, attempts - 1));
+      }
+      return Promise.reject(`Unexpected create data: ${JSON.stringify(data)}`);
+    });
 }
 
 async function _retryCreateTorrent(apiKey, infoHash, cachedEntryInfo, fileIndex) {
   const newTorrent = await _createTorrent(apiKey, infoHash);
   return newTorrent && statusReady(newTorrent)
-      ? _unrestrictLink(apiKey, infoHash, newTorrent, cachedEntryInfo, fileIndex)
-      : StaticResponse.FAILED_DOWNLOAD;
+    ? _unrestrictLink(apiKey, infoHash, newTorrent, cachedEntryInfo, fileIndex)
+    : StaticResponse.FAILED_DOWNLOAD;
 }
 
 async function freeLastActiveTorrent(apiKey) {
   const torrents = await getTorrentList(apiKey);
   const seedingTorrent = torrents.filter(statusSeeding).pop();
   if (seedingTorrent) {
-    console.log(`Stopping seeded item in TorBox to make space...`);
+    console.log('Stopping seeded item in TorBox to make space...');
     return controlTorrent(apiKey, seedingTorrent.id, 'stop_seeding');
   }
   const downloadingTorrent = torrents.filter(statusDownloading).pop();
   if (downloadingTorrent) {
-    console.log(`Deleting downloading item in TorBox to make space...`);
+    console.log('Deleting downloading item in TorBox to make space...');
     return controlTorrent(apiKey, downloadingTorrent.id, 'delete');
   }
   return Promise.reject({ detail: 'No torrent to pause found' });
@@ -163,8 +163,8 @@ async function freeLastActiveTorrent(apiKey) {
 async function _unrestrictLink(apiKey, infoHash, torrent, cachedEntryInfo, fileIndex, ip) {
   const targetFileName = decodeURIComponent(cachedEntryInfo);
   const videos = torrent.files
-      .filter(file => isVideo(file.short_name))
-      .sort((a, b) => b.size - a.size);
+    .filter(file => isVideo(file.short_name))
+    .sort((a, b) => b.size - a.size);
   const targetVideo = Number.isInteger(fileIndex)
       && videos.find(video => sameFilename(video.name, targetFileName))
       || videos[0];
@@ -183,43 +183,43 @@ async function getAvailabilityResponse(apiKey, hashes) {
   const headers = getHeaders(apiKey);
   const params = { hash: hashes.join(','), format: 'list' };
   return axios.get(url, { params, headers, timeout })
-      .then(response => {
-        if (response.data?.success) {
-          return Promise.resolve(response.data.data || []);
-        }
-        return Promise.reject(response.data);
-      })
-      .catch(error => Promise.reject(error.response?.data || error));
+    .then(response => {
+      if (response.data?.success) {
+        return Promise.resolve(response.data.data || []);
+      }
+      return Promise.reject(response.data);
+    })
+    .catch(error => Promise.reject(error.response?.data || error));
 }
 
 async function createTorrent(apiKey, magnetLink){
-  const url = `${baseUrl}/api/torrents/createtorrent`
+  const url = `${baseUrl}/api/torrents/createtorrent`;
   const headers = getHeaders(apiKey);
   const data = new URLSearchParams();
   data.append('magnet', magnetLink);
   data.append('allow_zip', 'false');
   return axios.post(url, data, { headers, timeout })
-      .then(response => {
-        if (response.data?.success) {
-          return Promise.resolve(response.data.data);
-        }
-        return Promise.reject(response.data);
-      })
-      .catch(error => Promise.reject(error.response?.data || error));
+    .then(response => {
+      if (response.data?.success) {
+        return Promise.resolve(response.data.data);
+      }
+      return Promise.reject(response.data);
+    })
+    .catch(error => Promise.reject(error.response?.data || error));
 }
 
 async function controlTorrent(apiKey, torrent_id, operation){
-  const url = `${baseUrl}/api/torrents/controltorrent`
+  const url = `${baseUrl}/api/torrents/controltorrent`;
   const headers = getHeaders(apiKey);
-  const data = { torrent_id, operation}
+  const data = { torrent_id, operation};
   return axios.post(url, data, { headers, timeout })
-      .then(response => {
-        if (response.data?.success) {
-          return Promise.resolve(response.data.data);
-        }
-        return Promise.reject(response.data);
-      })
-      .catch(error => Promise.reject(error.response?.data || error));
+    .then(response => {
+      if (response.data?.success) {
+        return Promise.resolve(response.data.data);
+      }
+      return Promise.reject(response.data);
+    })
+    .catch(error => Promise.reject(error.response?.data || error));
 }
 
 async function getTorrentList(apiKey, id = undefined, offset = 0) {
@@ -231,30 +231,30 @@ async function getItemList(apiKey, type, id = undefined, offset = 0) {
   const headers = getHeaders(apiKey);
   const params = { id, offset };
   return axios.get(url, { params, headers, timeout })
-      .then(response => {
-        if (response.data?.success) {
-          if (Array.isArray(response.data.data)) {
-            response.data.data.sort((a, b) => b.id - a.id);
-          }
-          return Promise.resolve(response.data.data);
+    .then(response => {
+      if (response.data?.success) {
+        if (Array.isArray(response.data.data)) {
+          response.data.data.sort((a, b) => b.id - a.id);
         }
-        return Promise.reject(response.data);
-      })
-      .catch(error => Promise.reject(error.response?.data || error));
+        return Promise.resolve(response.data.data);
+      }
+      return Promise.reject(response.data);
+    })
+    .catch(error => Promise.reject(error.response?.data || error));
 }
 
 async function getDownloadLink(token, type, rootId, file_id, user_ip) {
   const url = `${baseUrl}/api/${type}/requestdl`;
   const params = { token, torrent_id: rootId, usenet_id: rootId, web_id: rootId, file_id, user_ip };
   return axios.get(url, { params, timeout })
-      .then(response => {
-        if (response.data?.success) {
-          console.log(`Unrestricted TorBox ${type} [${rootId}] to ${response.data.data}`);
-          return Promise.resolve(response.data.data);
-        }
-        return Promise.reject(response.data);
-      })
-      .catch(error => Promise.reject(error.response?.data || error));
+    .then(response => {
+      if (response.data?.success) {
+        console.log(`Unrestricted TorBox ${type} [${rootId}] to ${response.data.data}`);
+        return Promise.resolve(response.data.data);
+      }
+      return Promise.reject(response.data);
+    })
+    .catch(error => Promise.reject(error.response?.data || error));
 }
 
 function getHeaders(apiKey) {
