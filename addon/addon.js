@@ -26,11 +26,6 @@ const builder = new addonBuilder(dummyManifest());
 const requestQueue = createNamedQueue(Infinity);
 const newLimiter = pLimit(30)
 
-// Custom implementation of nameToImdbPromise that uses our getImdbMetadata function
-function nameToImdbPromise(imdbId) {
-  return getImdbMetadata(imdbId);
-}
-
 // Function to get title from OMDB API
 async function getTitleFromOMDB(imdbId) {
   if (!OMDB_API_KEY) {
@@ -58,7 +53,7 @@ async function getTitle(imdbId) {
   
   // Try nameToImdb first
   try {
-    const meta = await nameToImdbPromise(imdbId);
+    const meta = await getImdbMetadata(imdbId);
     title = meta.name || '';
     if (title) {
       return title;
