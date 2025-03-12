@@ -130,33 +130,21 @@ builder.defineMetaHandler((args) => {
 });
 
 async function resolveStreams(args) {
+  // First check if we have cached results
+  const cachedResults = await cacheWrapStream(args.id, () => Promise.resolve([]));
+
+  if (cachedResults && cachedResults.length > 0) {
+    console.log(`[DEBUG] Returning ${cachedResults.length} cached results for ${args.id}`);
+    return cachedResults
+        .sort((a, b) => b.torrent.seeders - a.torrent.seeders || b.torrent.uploadDate - a.torrent.uploadDate)
+        .map(record => toStreamInfo(record));
+  }
+
+  console.log(`[DEBUG] No cached results for ${args.id}, proceeding with streamHandler...`);
+
   // Set a timeout for waiting for results
   const SEARCH_TIMEOUT = 30000; // 30 seconds timeout
-  
-  // Create a promise that resolves after the search completes or times out
-  const searchPromise = cacheWrapStream(args.id, () => newLimiter(() => streamHandler(args)
-    .then(records => records
-      .sort((a, b) => b.torrent.seeders - a.torrent.seeders || b.torrent.uploadDate - a.torrent.uploadDate)
-      .map(record => toStreamInfo(record)))));
-  
-  // First check if we have cached results
-  const results = await searchPromise;
-  
-  // If results came from cache or we have results, return them immediately
-  if (results && (results._fromCache || results.length > 0)) {
-    console.log(`[DEBUG] Returning ${results.length} results for ${args.id}${results._fromCache ? ' from cache' : ''}`);
-    
-    // Remove the _fromCache flag before returning
-    if (results._fromCache) {
-      delete results._fromCache;
-    }
-    
-    return results;
-  }
-  
-  // If we don't have cached results and no results yet, wait for the search with a timeout
-  console.log(`[DEBUG] No cached results for ${args.id}, waiting for search with timeout...`);
-  
+
   // Create a timeout promise
   const timeoutPromise = new Promise(resolve => {
     setTimeout(() => {
@@ -164,10 +152,9 @@ async function resolveStreams(args) {
       resolve([]);
     }, SEARCH_TIMEOUT);
   });
-  
-  // Race the search promise against the timeout
+
+  // Race the streamHandler promise against the timeout
   return Promise.race([
-    // We need to create a new promise here since we already awaited searchPromise
     newLimiter(() => streamHandler(args)
       .then(records => records
         .sort((a, b) => b.torrent.seeders - a.torrent.seeders || b.torrent.uploadDate - a.torrent.uploadDate)
