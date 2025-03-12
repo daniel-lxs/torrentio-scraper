@@ -135,7 +135,7 @@ async function resolveStreams(args) {
 
   if (cachedResults && cachedResults.length > 0) {
     console.log(`[DEBUG] Returning ${cachedResults.length} cached results for ${args.id}`);
-    return cachedResults
+    const filteredResults = cachedResults
         .filter(record => record && record.torrent) // Add safety check for torrent property
         .sort((a, b) => {
           // Add safety checks for seeders and uploadDate
@@ -146,6 +146,11 @@ async function resolveStreams(args) {
           return bSeeder - aSeeder || bDate - aDate;
         })
         .map(record => toStreamInfo(record));
+
+    if(filteredResults.length > 0) {
+      console.log(`[DEBUG] Returning ${filteredResults.length} filtered results for ${args.id}`);
+      return filteredResults;
+    }
   }
 
   console.log(`[DEBUG] No cached results for ${args.id}, proceeding with streamHandler...`);
@@ -164,17 +169,26 @@ async function resolveStreams(args) {
   // Race the streamHandler promise against the timeout
   return Promise.race([
     newLimiter(() => streamHandler(args)
-      .then(records => records
-        .filter(record => record && record.torrent) // Add safety check here too
-        .sort((a, b) => {
-          // Add safety checks for seeders and uploadDate
-          const aSeeder = a.torrent?.seeders || 0;
-          const bSeeder = b.torrent?.seeders || 0;
-          const aDate = a.torrent?.uploadDate || 0;
-          const bDate = b.torrent?.uploadDate || 0;
-          return bSeeder - aSeeder || bDate - aDate;
-        })
-        .map(record => toStreamInfo(record)))),
+      .then(records => {
+        // Add debug logging for new results too
+        if (records.length > 0) {
+          console.log('[DEBUG] First new result structure:', JSON.stringify(records[0], null, 2));
+        }
+        
+        const validRecords = records.filter(record => record && record.torrent);
+        console.log(`[DEBUG] Found ${validRecords.length} valid new results with torrent property out of ${records.length} total results`);
+        
+        return validRecords
+          .sort((a, b) => {
+            // Add safety checks for seeders and uploadDate
+            const aSeeder = a.torrent?.seeders || 0;
+            const bSeeder = b.torrent?.seeders || 0;
+            const aDate = a.torrent?.uploadDate || 0;
+            const bDate = b.torrent?.uploadDate || 0;
+            return bSeeder - aSeeder || bDate - aDate;
+          })
+          .map(record => toStreamInfo(record));
+      })),
     timeoutPromise
   ]);
 }

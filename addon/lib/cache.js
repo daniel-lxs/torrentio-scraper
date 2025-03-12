@@ -128,8 +128,12 @@ export function cacheWrapStream(id, method) {
       const value = await redis.get(key);
       if (value !== undefined && value !== null) {
         console.log(`[DEBUG] Found cached value for ${id} with ${JSON.parse(value).length} results`);
-        // Add a flag to indicate this came from cache
-        const result = JSON.parse(value);
+        // Parse the cached data and reconstruct the structure
+        const parsed = JSON.parse(value);
+        const result = parsed.map(record => ({
+          ...record,
+          torrent: record.Torrent || record.torrent // Handle both capitalized and lowercase
+        }));
         result._fromCache = true;
         return result;
       }
@@ -139,9 +143,15 @@ export function cacheWrapStream(id, method) {
       const result = await method();
       console.log(`[DEBUG] Search completed for ${id}, found ${result.length} results`);
       
+      // Prepare data for caching by explicitly structuring it
+      const toCache = result.map(record => ({
+        ...record.get({ plain: true }), // Convert Sequelize model to plain object
+        torrent: record.Torrent ? record.Torrent.get({ plain: true }) : record.torrent // Handle both model and plain object cases
+      }));
+      
       // Cache the result with appropriate TTL
       const ttl = result.length ? STREAM_TTL : STREAM_EMPTY_TTL;
-      await redis.setEx(key, ttl, JSON.stringify(result));
+      await redis.setEx(key, ttl, JSON.stringify(toCache));
       console.log(`[DEBUG] Cached ${result.length} results for ${id} with TTL ${ttl}`);
       
       return result;
