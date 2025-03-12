@@ -136,7 +136,15 @@ async function resolveStreams(args) {
   if (cachedResults && cachedResults.length > 0) {
     console.log(`[DEBUG] Returning ${cachedResults.length} cached results for ${args.id}`);
     return cachedResults
-        .sort((a, b) => b.torrent.seeders - a.torrent.seeders || b.torrent.uploadDate - a.torrent.uploadDate)
+        .filter(record => record && record.torrent) // Add safety check for torrent property
+        .sort((a, b) => {
+          // Add safety checks for seeders and uploadDate
+          const aSeeder = a.torrent?.seeders || 0;
+          const bSeeder = b.torrent?.seeders || 0;
+          const aDate = a.torrent?.uploadDate || 0;
+          const bDate = b.torrent?.uploadDate || 0;
+          return bSeeder - aSeeder || bDate - aDate;
+        })
         .map(record => toStreamInfo(record));
   }
 
@@ -157,7 +165,15 @@ async function resolveStreams(args) {
   return Promise.race([
     newLimiter(() => streamHandler(args)
       .then(records => records
-        .sort((a, b) => b.torrent.seeders - a.torrent.seeders || b.torrent.uploadDate - a.torrent.uploadDate)
+        .filter(record => record && record.torrent) // Add safety check here too
+        .sort((a, b) => {
+          // Add safety checks for seeders and uploadDate
+          const aSeeder = a.torrent?.seeders || 0;
+          const bSeeder = b.torrent?.seeders || 0;
+          const aDate = a.torrent?.uploadDate || 0;
+          const bDate = b.torrent?.uploadDate || 0;
+          return bSeeder - aSeeder || bDate - aDate;
+        })
         .map(record => toStreamInfo(record)))),
     timeoutPromise
   ]);
