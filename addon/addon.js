@@ -67,39 +67,48 @@ async function getTitle(imdbId) {
   return getTitleFromOMDB(imdbId);
 }
 
-builder.defineStreamHandler((args) => {
+builder.defineStreamHandler(async (args) => {
   if (!args.id.match(/tt\d+/i) && !args.id.match(/kitsu:\d+/i)) {
-    return Promise.resolve({ streams: [] });
+    return { streams: [] };
   }
 
-  console.log(`[DEBUG] Stream request received for ${args.id}`);
-  return requestQueue.wrap(args.id, () => resolveStreams(args))
-    .then(streams => {
-      console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} before filtering`);
-      return applyFilters(streams, args.extra);
-    })
-    .then(streams => {
-      console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after filtering`);
-      return applySorting(streams, args.extra, args.type);
-    })
-    .then(streams => {
-      console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after sorting`);
-      return applyStaticInfo(streams);
-    })
-    .then(streams => {
-      console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after static info`);
-      return applyMochs(streams, args.extra);
-    })
-    .then(streams => {
-      console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after mochs`);
-      const result = enrichCacheParams(streams);
-      console.log(`[DEBUG] Returning ${result.streams.length} streams to Stremio for ${args.id}`);
-      return result;
-    })
-    .catch(error => {
-      console.error(`[ERROR] Failed request ${args.id}: ${error}`);
-      return Promise.reject(`Failed request ${args.id}: ${error}`);
-    });
+  try {
+    console.log(`[DEBUG] Stream request received for ${args.id}`);
+    
+    let streams = await requestQueue.wrap(args.id, () => resolveStreams(args));
+    console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} before filtering`);
+    if (streams.length === 0) {
+      return enrichCacheParams([]);
+    }
+
+    streams = await applyFilters(streams, args.extra);
+    console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after filtering`);
+    if (streams.length === 0) {
+      return enrichCacheParams([]);
+    }
+
+    streams = await applySorting(streams, args.extra, args.type);
+    console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after sorting`);
+    if (streams.length === 0) {
+      return enrichCacheParams([]);
+    }
+
+    streams = await applyStaticInfo(streams);
+    console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after static info`);
+    if (streams.length === 0) {
+      return enrichCacheParams([]);
+    }
+
+    streams = await applyMochs(streams, args.extra);
+    console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after mochs`);
+    
+    const result = enrichCacheParams(streams);
+    console.log(`[DEBUG] Returning ${result.streams.length} streams to Stremio for ${args.id}`);
+    return result;
+  } catch (error) {
+    console.error(`[ERROR] Failed request ${args.id}: ${error}`);
+    throw `Failed request ${args.id}: ${error}`;
+  }
 });
 
 builder.defineCatalogHandler((args) => {
