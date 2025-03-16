@@ -115,7 +115,7 @@ export async function resolve(parameters) {
       console.warn(error);
       return StaticResponse.FAILED_UNEXPECTED;
     })
-    .then(url => isStaticUrl(url) ? `${parameters.host}/${url}` : url);
+    .then(url => isStaticUrl(url) ? `${parameters.host}${url}` : url);
   return unrestrictQueues[moch.key].wrap(id, method);
 }
 
