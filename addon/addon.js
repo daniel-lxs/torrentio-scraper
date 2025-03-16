@@ -14,12 +14,13 @@ import { searchContent } from './lib/scraper/prowlarr.js';
 import axios from 'axios';
 import { setTimeout } from 'timers/promises';
 import { getImdbMetadata } from './lib/imdb.js';
+import { STREMIO_CACHE } from './lib/cacheConfig.js';
 
-const CACHE_MAX_AGE = parseInt(process.env.CACHE_MAX_AGE) || 60 * 60; // 1 hour in seconds
-const CACHE_MAX_AGE_EMPTY = 60; // 60 seconds
+const CACHE_MAX_AGE = parseInt(process.env.CACHE_MAX_AGE) || STREMIO_CACHE.MAX_AGE;
+const CACHE_MAX_AGE_EMPTY = STREMIO_CACHE.MAX_AGE_EMPTY;
 const CATALOG_CACHE_MAX_AGE = 0; // 0 minutes
-const STALE_REVALIDATE_AGE = 4 * 60 * 60; // 4 hours
-const STALE_ERROR_AGE = 7 * 24 * 60 * 60; // 7 days
+const STALE_REVALIDATE_AGE = STREMIO_CACHE.STALE_REVALIDATE;
+const STALE_ERROR_AGE = STREMIO_CACHE.STALE_ERROR;
 const OMDB_API_KEY = process.env.OMDB_API_KEY || ''; // Add OMDB API key to environment variables
 
 const builder = new addonBuilder(dummyManifest());

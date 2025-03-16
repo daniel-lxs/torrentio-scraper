@@ -1,19 +1,13 @@
 import { createClient } from 'redis';
 import { isStaticUrl }  from '../moch/static.js';
 import { setTimeout } from 'timers/promises';
+import { CACHE_TTL } from './cacheConfig.js';
 
 const GLOBAL_KEY_PREFIX = 'torrentio-addon';
 const STREAM_KEY_PREFIX = `${GLOBAL_KEY_PREFIX}|stream`;
 const AVAILABILITY_KEY_PREFIX = `${GLOBAL_KEY_PREFIX}|availability`;
 const RESOLVED_URL_KEY_PREFIX = `${GLOBAL_KEY_PREFIX}|resolved`;
 const PLAYED_TORRENT_KEY_PREFIX = `${GLOBAL_KEY_PREFIX}|played`;
-
-const STREAM_TTL = 24 * 60 * 60; // 24 hours in seconds
-const STREAM_EMPTY_TTL = 60; // 1 minute in seconds
-const RESOLVED_URL_TTL = 3 * 60 * 60; // 3 hours in seconds
-const AVAILABILITY_TTL = 5 * 24 * 60 * 60; // 5 days in seconds
-const PLAYED_TORRENT_TTL = 7 * 24 * 60 * 60; // 7 days in seconds - how long to consider a torrent as "played"
-const MESSAGE_VIDEO_URL_TTL = 60; // 1 minute in seconds
 // When the streams are empty we want to cache it for less time in case of timeouts or failures
 
 // Redis operation metrics
@@ -150,7 +144,7 @@ export function cacheWrapStream(id, method) {
       }));
       
       // Cache the result with appropriate TTL
-      const ttl = result.length ? STREAM_TTL : STREAM_EMPTY_TTL;
+      const ttl = result.length ? CACHE_TTL.STREAM : CACHE_TTL.STREAM_EMPTY;
       await redis.setEx(key, ttl, JSON.stringify(toCache));
       console.log(`[DEBUG] Cached ${result.length} results for ${id} with TTL ${ttl}`);
       
@@ -164,7 +158,7 @@ export function cacheWrapStream(id, method) {
 }
 
 export function cacheWrapResolvedUrl(id, method) {
-  const ttl = (url) => isStaticUrl(url) ? MESSAGE_VIDEO_URL_TTL : RESOLVED_URL_TTL;
+  const ttl = (url) => isStaticUrl(url) ? CACHE_TTL.MESSAGE_VIDEO_URL : CACHE_TTL.RESOLVED_URL;
   return cacheWrap(`${RESOLVED_URL_KEY_PREFIX}:${id}`, method, ttl);
 }
 
@@ -184,7 +178,7 @@ export async function cacheAvailabilityResults(infoHash, fileIds) {
     if (!containsFileIds(result)) {
       result.push(fileIds);
       result.sort((a, b) => b.length - a.length);
-      await redis.setEx(key, AVAILABILITY_TTL, JSON.stringify(result));
+      await redis.setEx(key, CACHE_TTL.AVAILABILITY, JSON.stringify(result));
     }
   } catch (error) {
     console.error(`Error caching availability results for ${infoHash}:`, error);
@@ -207,7 +201,7 @@ export async function removeAvailabilityResults(infoHash, fileIds) {
     
     if (storedIndex >= 0) {
       result.splice(storedIndex, 1);
-      await redis.setEx(key, AVAILABILITY_TTL, JSON.stringify(result));
+      await redis.setEx(key, CACHE_TTL.AVAILABILITY, JSON.stringify(result));
     }
   } catch (error) {
     console.error(`Error removing availability results for ${infoHash}:`, error);
@@ -258,7 +252,7 @@ export async function markTorrentAsPlayed(infoHash, fileIndex) {
   
   try {
     // Store the current timestamp as the value
-    await executeWithRetry(() => redis.setEx(key, PLAYED_TORRENT_TTL, Date.now().toString()));
+    await executeWithRetry(() => redis.setEx(key, CACHE_TTL.AVAILABILITY, Date.now().toString()));
     console.log(`[DEBUG] Marked torrent ${infoHash} [${fileIndex}] as played`);
     return true;
   } catch (error) {

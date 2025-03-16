@@ -5,6 +5,7 @@ import { extractInfoHash } from '../magnetHelper.js';
 import * as ptt from 'parse-torrent-title';
 import { Providers, refreshProviders } from '../filter.js';
 import { URLSearchParams } from 'url';
+import { CACHE_TTL } from '../cacheConfig.js';
 
 // Constants
 const PROWLARR_BASE_URL = process.env.PROWLARR_BASE_URL || 'http://localhost:9696';
@@ -358,10 +359,22 @@ export async function searchContent(title, type, imdbId, kitsuId, season, episod
     }
   }
 
-  // If we have enough results from the database, return them
+  // Check if we have enough results and they are fresh (less than 24 hours old)
   if (results.length >= 10) {
-    console.log(`Found ${results.length} results in database for ${imdbId || kitsuId}`);
-    return results;
+    const now = new Date();
+    const refreshTime = new Date(now - CACHE_TTL.DATABASE_REFRESH * 1000);
+    
+    // Check if all results are fresh
+    const allResultsFresh = results.every(result => {
+      const uploadDate = new Date(result.torrent.uploadDate);
+      return uploadDate > refreshTime;
+    });
+
+    if (allResultsFresh) {
+      console.log(`Found ${results.length} fresh results in database for ${imdbId || kitsuId}`);
+      return results;
+    }
+    console.log(`Found ${results.length} results in database for ${imdbId || kitsuId} but some are older than 24 hours`);
   }
 
   // Check if title is valid before searching Prowlarr
@@ -383,8 +396,8 @@ export async function searchContent(title, type, imdbId, kitsuId, season, episod
     })
     .filter(id => id !== undefined);
 
-  // Otherwise, search Prowlarr
-  console.log(`Not enough results in database, searching Prowlarr for ${searchTitle}`);
+  // Search Prowlarr when we don't have enough results or they're stale
+  console.log(`Searching Prowlarr for ${searchTitle} (insufficient or stale database results)`);
   const prowlarrResults = await searchProwlarr(searchTitle, type, season, episode, selectedIndexerIds);
   
   // If there was an error or no results, return what we have from the database
