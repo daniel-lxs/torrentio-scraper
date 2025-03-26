@@ -33,60 +33,6 @@ const limiter = rateLimit({
 
 router.use(cors());
 
-// API key validation middleware
-const validateApiKey = async (req, res, next) => {
-  // Skip validation for specific routes
-  const skipPaths = [
-    /^\/configure$/,
-    /^\/[^/]+\/configure$/,
-    /^\/admin$/,
-    /^\/admin\.html$/,
-    /^\/admin\/.*/,
-    /^\/manifest.json$/,
-    /^\/[^/]+\/manifest.json$/,
-    /^\/static\/.*/,
-    /^\/options$/  // Also skip validation for options endpoint
-  ];
-  
-  if (skipPaths.some(pattern => pattern.test(req.url))) {
-    return next();
-  }
-  
-  // Extract API key from configuration in URL
-  const urlParts = req.url.split('/');
-  const configuration = urlParts[1] || '';
-  
-  // Parse configuration to get API key from URL
-  const configValues = parseConfiguration(configuration);
-  
-  // Get API key from Stremio's config object (if available)
-  // For streaming handlers, the config is passed in args
-  let apiKey = null;
-  
-  // Check if we have a configuration from Stremio
-  if (req.args && req.args.config && req.args.config.apiKey) {
-    apiKey = req.args.config.apiKey;
-  } else {
-    // Fall back to URL configuration for backward compatibility
-    apiKey = configValues.apiKey;
-  }
-  
-  // Validate the API key
-  const isValid = await repository.validateApiKey(apiKey);
-  
-  if (isValid) {
-    // Store the validated key in req for use in handlers
-    req.validatedApiKey = apiKey;
-    next();
-  } else {
-    res.writeHead(401);
-    res.end(JSON.stringify({ error: 'Invalid or missing API key' }));
-  }
-};
-
-// Apply API key validation middleware to all routes
-router.use(validateApiKey);
-
 // Serve static files
 router.get('/static/*', (req, res) => {
   const filePath = join(__dirname, 'static', req.url.replace('/static/', ''));
@@ -170,19 +116,6 @@ router.get('/:configuration?/:resource/:type/:id/:extra?.json', limiter, (req, r
     type, 
     ip, 
     host 
-  };
-  
-  // Add the validated API key if available (from middleware)
-  if (req.validatedApiKey) {
-    config.apiKey = req.validatedApiKey;
-  }
-  
-  // Save the request args for the middleware to use
-  req.args = {
-    config: {
-      apiKey: config.apiKey
-    },
-    extra: extra
   };
   
   addonInterface.get(resource, type, id, config)

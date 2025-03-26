@@ -68,6 +68,19 @@ async function getTitle(imdbId) {
   return getTitleFromOMDB(imdbId);
 }
 
+// Helper function to validate API key
+async function validateApiKey(config) {
+  const apiKey = config?.apiKey;
+  if (!apiKey) {
+    throw new Error('API key is required. Please configure the addon with your API key.');
+  }
+  const isValid = await repository.validateApiKey(apiKey);
+  if (!isValid) {
+    throw new Error('Invalid API key. Please check your configuration.');
+  }
+  return apiKey;
+}
+
 builder.defineStreamHandler(async (args) => {
   if (!args.id.match(/tt\d+/i) && !args.id.match(/kitsu:\d+/i)) {
     return { streams: [] };
@@ -75,13 +88,18 @@ builder.defineStreamHandler(async (args) => {
 
   try {
     console.log(`[DEBUG] Stream request received for ${args.id}`);
+    console.log('[DEBUG] Stream handler args:', JSON.stringify(args, null, 2));
     
     // Create a merged config object that includes both extra and config
     const config = {
       ...args.extra,
-      // If there's a config with apiKey, include it
       ...(args.config || {})
     };
+    
+    console.log('[DEBUG] Merged config:', JSON.stringify(config, null, 2));
+
+    // Validate API key
+    await validateApiKey(config);
     
     let streams = await requestQueue.wrap(args.id, () => resolveStreams(args, config));
     console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} before filtering`);
@@ -119,17 +137,21 @@ builder.defineStreamHandler(async (args) => {
   }
 });
 
-builder.defineCatalogHandler((args) => {
-  // eslint-disable-next-line no-unused-vars
+builder.defineCatalogHandler(async (args) => {
   const [_, mochKey, catalogId] = args.id.split('-');
   console.log(`Incoming catalog ${args.id} request with skip=${args.extra.skip || 0}`);
+  console.log('[DEBUG] Catalog handler args:', JSON.stringify(args, null, 2));
   
   // Create a merged config object that includes both extra and config
   const config = {
     ...args.extra,
-    // If there's a config with apiKey, include it
     ...(args.config || {})
   };
+  
+  console.log('[DEBUG] Merged config:', JSON.stringify(config, null, 2));
+
+  // Validate API key
+  await validateApiKey(config);
   
   return getMochCatalog(mochKey, catalogId, config)
     .then(metas => ({
@@ -141,16 +163,21 @@ builder.defineCatalogHandler((args) => {
     });
 });
 
-builder.defineMetaHandler((args) => {
+builder.defineMetaHandler(async (args) => {
   const [mochKey, metaId] = args.id.split(':');
   console.log(`Incoming debrid meta ${args.id} request`);
+  console.log('[DEBUG] Meta handler args:', JSON.stringify(args, null, 2));
   
   // Create a merged config object that includes both extra and config
   const config = {
     ...args.extra,
-    // If there's a config with apiKey, include it
     ...(args.config || {})
   };
+  
+  console.log('[DEBUG] Merged config:', JSON.stringify(config, null, 2));
+
+  // Validate API key
+  await validateApiKey(config);
   
   return getMochItemMeta(mochKey, metaId, config)
     .then(meta => ({
