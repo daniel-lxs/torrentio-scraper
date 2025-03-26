@@ -70,7 +70,7 @@ async function getTitle(imdbId) {
 
 // Helper function to validate API key
 async function validateApiKey(config) {
-  const apiKey = config?.apiKey;
+  const apiKey = config?.apikey;
   if (!apiKey) {
     throw new Error('API key is required. Please configure the addon with your API key.');
   }

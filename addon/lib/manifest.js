@@ -22,7 +22,7 @@ export function manifest(config = {}) {
     },
     config: [
       {
-        key: "apiKey",
+        key: "apikey",
         type: "text", 
         required: true
       }
