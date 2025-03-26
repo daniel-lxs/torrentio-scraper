@@ -18,7 +18,6 @@ export function manifest(config = {}) {
     logo: 'https://mirador.darknimbus.top/static/logo.jpeg',
     behaviorHints: {
       configurable: true,
-      configurationRequired: true
     },
     config: [
       {
