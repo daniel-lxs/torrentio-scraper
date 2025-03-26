@@ -20,13 +20,14 @@ export function parseConfiguration(configuration) {
     .reduce((map, next) => {
       const parameterParts = next.split('=');
       if (parameterParts.length === 2) {
-        map[parameterParts[0].toLowerCase()] = parameterParts[1];
+        const key = parameterParts[0].toLowerCase();
+        map[key] = keysToSplit.includes(key) ? parameterParts[1] : parameterParts[1].toLowerCase();
       }
       return map;
     }, {});
   keysToSplit
     .filter(key => configValues[key])
     .forEach(key => configValues[key] = configValues[key].split(',')
-      .map(value => keysToUppercase.includes(key) ? value.toUpperCase() : value.toLowerCase()));
+      .map(value => keysToUppercase.includes(key) ? value.toUpperCase() : value));
   return configValues;
 }

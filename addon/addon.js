@@ -76,19 +76,26 @@ builder.defineStreamHandler(async (args) => {
   try {
     console.log(`[DEBUG] Stream request received for ${args.id}`);
     
-    let streams = await requestQueue.wrap(args.id, () => resolveStreams(args));
+    // Create a merged config object that includes both extra and config
+    const config = {
+      ...args.extra,
+      // If there's a config with apiKey, include it
+      ...(args.config || {})
+    };
+    
+    let streams = await requestQueue.wrap(args.id, () => resolveStreams(args, config));
     console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} before filtering`);
     if (streams.length === 0) {
       return enrichCacheParams([]);
     }
 
-    streams = await applyFilters(streams, args.extra);
+    streams = await applyFilters(streams, config);
     console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after filtering`);
     if (streams.length === 0) {
       return enrichCacheParams([]);
     }
 
-    streams = await applySorting(streams, args.extra, args.type);
+    streams = await applySorting(streams, config, args.type);
     console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after sorting`);
     if (streams.length === 0) {
       return enrichCacheParams([]);
@@ -100,7 +107,7 @@ builder.defineStreamHandler(async (args) => {
       return enrichCacheParams([]);
     }
 
-    streams = await applyMochs(streams, args.extra);
+    streams = await applyMochs(streams, config);
     console.log(`[DEBUG] Got ${streams.length} streams for ${args.id} after mochs`);
     
     const result = enrichCacheParams(streams);
@@ -116,7 +123,15 @@ builder.defineCatalogHandler((args) => {
   // eslint-disable-next-line no-unused-vars
   const [_, mochKey, catalogId] = args.id.split('-');
   console.log(`Incoming catalog ${args.id} request with skip=${args.extra.skip || 0}`);
-  return getMochCatalog(mochKey, catalogId, args.extra)
+  
+  // Create a merged config object that includes both extra and config
+  const config = {
+    ...args.extra,
+    // If there's a config with apiKey, include it
+    ...(args.config || {})
+  };
+  
+  return getMochCatalog(mochKey, catalogId, config)
     .then(metas => ({
       metas: metas,
       cacheMaxAge: CATALOG_CACHE_MAX_AGE
@@ -129,7 +144,15 @@ builder.defineCatalogHandler((args) => {
 builder.defineMetaHandler((args) => {
   const [mochKey, metaId] = args.id.split(':');
   console.log(`Incoming debrid meta ${args.id} request`);
-  return getMochItemMeta(mochKey, metaId, args.extra)
+  
+  // Create a merged config object that includes both extra and config
+  const config = {
+    ...args.extra,
+    // If there's a config with apiKey, include it
+    ...(args.config || {})
+  };
+  
+  return getMochItemMeta(mochKey, metaId, config)
     .then(meta => ({
       meta: meta,
       cacheMaxAge: metaId === 'Downloads' ? 0 : CACHE_MAX_AGE
@@ -139,7 +162,7 @@ builder.defineMetaHandler((args) => {
     });
 });
 
-async function resolveStreams(args) {
+async function resolveStreams(args, config) {
   // First check if we have cached results
   const cachedResults = await cacheWrapStream(args.id, () => Promise.resolve([]));
 
@@ -178,7 +201,7 @@ async function resolveStreams(args) {
 
   // Race the streamHandler promise against the timeout
   return Promise.race([
-    newLimiter(() => streamHandler(args)
+    newLimiter(() => streamHandler(args, config)
       .then(records => {
         // Add debug logging for new results too
         if (records.length > 0) {
@@ -203,17 +226,17 @@ async function resolveStreams(args) {
   ]);
 }
 
-async function streamHandler(args) {
+async function streamHandler(args, config) {
   console.log(`[DEBUG] Processing stream request for ${args.id}`);
   if (args.type === Type.MOVIE) {
-    return movieRecordsHandler(args);
+    return movieRecordsHandler(args, config);
   } else if (args.type === Type.SERIES) {
-    return seriesRecordsHandler(args);
+    return seriesRecordsHandler(args, config);
   }
   return Promise.reject('not supported type');
 }
 
-async function seriesRecordsHandler(args) {
+async function seriesRecordsHandler(args, config) {
   if (args.id.match(/^tt\d+:\d+:\d+$/)) {
     const parts = args.id.split(':');
     const imdbId = parts[0];
@@ -242,7 +265,7 @@ async function seriesRecordsHandler(args) {
     }
     
     // Get selected providers from config
-    const selectedProviders = args.extra?.providers || [];
+    const selectedProviders = config?.providers || [];
     
     // Use Prowlarr scraper if enabled
     if (process.env.PROWLARR_API_KEY) {
@@ -284,7 +307,7 @@ async function seriesRecordsHandler(args) {
     let title = '';
     
     // Get selected providers from config
-    const selectedProviders = args.extra?.providers || [];
+    const selectedProviders = config?.providers || [];
     
     // Use Prowlarr scraper if enabled
     if (process.env.PROWLARR_API_KEY && episode !== undefined && title) {
@@ -299,7 +322,7 @@ async function seriesRecordsHandler(args) {
   return Promise.resolve([]);
 }
 
-async function movieRecordsHandler(args) {
+async function movieRecordsHandler(args, config) {
   if (args.id.match(/^tt\d+$/)) {
     const parts = args.id.split(':');
     const imdbId = parts[0];
@@ -326,7 +349,7 @@ async function movieRecordsHandler(args) {
     }
     
     // Get selected providers from config
-    const selectedProviders = args.extra?.providers || [];
+    const selectedProviders = config?.providers || [];
     
     // Use Prowlarr scraper if enabled
     if (process.env.PROWLARR_API_KEY) {
@@ -355,7 +378,7 @@ async function movieRecordsHandler(args) {
     let title = '';
     
     // Get selected providers from config
-    const selectedProviders = args.extra?.providers || [];
+    const selectedProviders = config?.providers || [];
     
     // Use Prowlarr scraper if enabled
     if (process.env.PROWLARR_API_KEY && title) {

@@ -104,8 +104,34 @@ router.get('/:configuration?/:resource/:type/:id/:extra?.json', limiter, (req, r
   const extra = req.params.extra ? qs.parse(req.url.split('/').pop().slice(0, -5)) : {};
   const ip = requestIp.getClientIp(req);
   const host = `${req.protocol}://${req.headers.host}`;
-  const configValues = { ...extra, ...parseConfiguration(configuration), id, type, ip, host };
-  addonInterface.get(resource, type, id, configValues)
+  
+  // Parse configuration from URL for backward compatibility
+  const configFromUrl = parseConfiguration(configuration);
+  
+  // Create a new config object that merges URL config with any validated API key
+  const config = { 
+    ...extra, 
+    ...configFromUrl, 
+    id, 
+    type, 
+    ip, 
+    host 
+  };
+  
+  // Add the validated API key if available (from middleware)
+  if (req.validatedApiKey) {
+    config.apiKey = req.validatedApiKey;
+  }
+  
+  // Save the request args for the middleware to use
+  req.args = {
+    config: {
+      apiKey: config.apiKey
+    },
+    extra: extra
+  };
+  
+  addonInterface.get(resource, type, id, config)
     .then(resp => {
       const cacheHeaders = {
         cacheMaxAge: 'max-age',
@@ -212,14 +238,27 @@ const validateApiKey = async (req, res, next) => {
   const urlParts = req.url.split('/');
   const configuration = urlParts[1] || '';
   
-  // Parse configuration to get API key
+  // Parse configuration to get API key from URL
   const configValues = parseConfiguration(configuration);
-  const apiKey = configValues.apiKey;
+  
+  // Get API key from Stremio's config object (if available)
+  // For streaming handlers, the config is passed in args
+  let apiKey = null;
+  
+  // Check if we have a configuration from Stremio
+  if (req.args && req.args.config && req.args.config.apiKey) {
+    apiKey = req.args.config.apiKey;
+  } else {
+    // Fall back to URL configuration for backward compatibility
+    apiKey = configValues.apiKey;
+  }
   
   // Validate the API key
   const isValid = await repository.validateApiKey(apiKey);
   
   if (isValid) {
+    // Store the validated key in req for use in handlers
+    req.validatedApiKey = apiKey;
     next();
   } else {
     res.writeHead(401);

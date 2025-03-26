@@ -18,8 +18,15 @@ export function manifest(config = {}) {
     logo: 'https://mirador.darknimbus.top/static/logo.jpeg',
     behaviorHints: {
       configurable: true,
-      configurationRequired: false
-    }
+      configurationRequired: true
+    },
+    config: [
+      {
+        key: "apiKey",
+        type: "text", 
+        required: true
+      }
+    ]
   };
   return baseManifest;
 }
